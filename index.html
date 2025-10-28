@@ -47,13 +47,18 @@
 
   /* Ring */
   .ringWrap{display:grid;place-items:center;margin-top:10px}
-  .ring{position:relative;width:var(--ring-size);aspect-ratio:1/1;border-radius:50%;background:#121719;box-shadow:inset 0 0 0 2px rgba(255,255,255,.05)}
+  .ring{position:relative;width:var(--ring-size);aspect-ratio:1/1;border-radius:50%;background:#121719;box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),0 0 8px rgba(255,255,255,.06)}
+  .ring:not(.btc){animation:ringPulse 8s ease-in-out infinite}
   /* Symbol (ASCII‑safe via Unicode‑Escape) */
   .ring::after{content:"\221E";position:absolute;inset:0;display:grid;place-items:center;font-size:var(--symbol-size);color:rgba(255,255,255,.14)}
   /* EDIT: THEME (Bitcoin bei 21 Minuten) */
-  .ring.btc{background:var(--btc);box-shadow:inset 0 0 0 3px #F7931A,0 0 32px rgba(247,147,26,.55)}
+  .ring.btc{background:var(--btc);box-shadow:inset 0 0 0 3px #F7931A,0 0 32px rgba(247,147,26,.55);animation:none}
   .ring.btc::after{content:"\20BF";color:#fff;text-shadow:0 0 20px rgba(255,255,255,.35)}
   /* /EDIT: THEME */
+  @keyframes ringPulse{
+    0%,100%{box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),0 0 8px rgba(255,255,255,.06)}
+    50%{box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),0 0 18px rgba(255,255,255,.18)}
+  }
 
   /* Punkte: 20% grösser, näher am Zentrum (via JS‑Radius) */
   .dot{position:absolute;width:29px;height:29px;border-radius:50%;background:var(--dot);transform:translate(-50%,-50%);z-index:2}
@@ -166,13 +171,14 @@
 <script>
 // EDIT: CONFIG (Konstanten anpassen)
 const N = 16;           // Anzahl Felder (fix)
-const RADIUS = 140;     // Abstand der Punkte vom Zentrum (kleiner = naeher zur Mitte)
+const RADIUS = 161;     // 30% naehere Platzierung der Punkte zum Rand
 const TRAIL_LEN = 6;    // Laenge der Trail‑Spur (optisch)
 // /EDIT: CONFIG
 
 // State & Elemente
 let pos=0, steps=0, cw=0, ccw=0, hits=0, misses=0;
 let trail=[], hist=[], running=false, endAt=0, interval=800, timer=null, focusDir=1;
+let ringTapCount=0, btcUnlocked=false;
 const ring = document.getElementById('ring');
 const startSel = document.getElementById('start');
 const durSel = document.getElementById('duration');
@@ -191,6 +197,7 @@ const clearSessionsBtn = document.getElementById('clearSessions');
 
 // Storage
 const SKEY='pke7g_sessions_v2';
+const BTC_UNLOCK_KEY='pke7g_btc_unlock';
 let sessions=[], lastStats=null;
 function loadSessions(){ try{ const s=localStorage.getItem(SKEY); sessions=s?JSON.parse(s):[] }catch(e){ sessions=[]; storageNoteEl.textContent='Lokaler Speicher nicht verfuegbar. Bitte exportieren.' } }
 function persistSessions(){ try{ localStorage.setItem(SKEY, JSON.stringify(sessions)); storageNoteEl.textContent=''; return true }catch(e){ storageNoteEl.textContent='Speicher voll/blockiert. Export empfohlen.'; return false } }
@@ -213,8 +220,8 @@ function stopExp(){ running=false; toggleBtn.textContent='Experiment starten'; d
 function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; saveBtn.disabled=true; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
-function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; ring.classList.toggle('btc', is21) }
-// /EDIT: THEME‑LOGIK
+function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const useBTC = btcUnlocked || is21; ring.classList.toggle('btc', useBTC) }
+// /EDIT: THEME-LOGIK
 
 // Chart & Stats
 function drawChart(){ const ctx=chart.getContext('2d'); const W=chart.width=chart.clientWidth*2, H=chart.height=chart.clientHeight*2; const pad=40, w=W-2*pad, h=H-2*pad; ctx.clearRect(0,0,W,H); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pad, pad+h/2); ctx.lineTo(pad+w, pad+h/2); ctx.stroke(); let cum=0; ctx.beginPath(); ctx.lineWidth=3; ctx.strokeStyle='rgba(124,255,107,.9)'; for(let i=0;i<hist.length;i++){ cum += hist[i]; const x=pad + (i/(hist.length-1||1))*w; const y=pad + h/2 - (cum/Math.sqrt(hist.length||1))*(h/2*0.9); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y) } ctx.stroke() }
@@ -233,10 +240,16 @@ exportJSONBtn.onclick = exportAllJSON;
 exportCSVBtn.onclick = exportAllCSV;
 clearSessionsBtn.onclick = ()=>{ if(confirm('Alle gespeicherten Sessions loeschen?')){ sessions=[]; persistSessions(); updateSessionList() } };
 
-// Tests (Konsole, optional)
-function runTests(){ const orig=Math.random; try{ Math.random=()=>0.9; const cw0=cw, ccw0=ccw; step(); console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc'); Math.random=()=>0.1; const cw1=cw, ccw1=ccw; step(); console.assert(ccw===ccw1+1 && cw===cw1, 'ccw inc'); const prev=ring.classList.contains('btc'); durSel.value='21'; applyThemeFromDuration(); console.assert(ring.classList.contains('btc'), 'btc on 21'); durSel.value='1'; applyThemeFromDuration(); console.assert(!ring.classList.contains('btc'), 'btc off'); if(prev){ durSel.value='21'; applyThemeFromDuration() } const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]); console.assert(csv.startsWith('time,'),'csv header'); console.assert(csv.indexOf('\n')!==-1,'csv newline'); cw=5; ccw=5; hits=5; misses=5; showSummary(); console.assert(saveBtn.disabled===false,'save enabled') } catch(e){ console.warn('tests failed', e) } finally { Math.random=orig; resetExp() } }
+// BTC Unlock (21 Taps)
+function loadBtcUnlock(){ try{ btcUnlocked = localStorage.getItem(BTC_UNLOCK_KEY)==='1' }catch(e){ btcUnlocked=false } }
+function persistBtcUnlock(){ try{ if(btcUnlocked){ localStorage.setItem(BTC_UNLOCK_KEY,'1') } else { localStorage.removeItem(BTC_UNLOCK_KEY) } }catch(e){} }
+function registerRingTap(){ if(btcUnlocked) return; ringTapCount++; if(ringTapCount>=21){ btcUnlocked=true; ringTapCount=0; persistBtcUnlock(); applyThemeFromDuration() } }
+ring.addEventListener('click', registerRingTap);
 
-loadSessions(); updateSessionList(); init(); runTests();
+// Tests (Konsole, optional)
+function runTests(){ const orig=Math.random; const unlockPrev=btcUnlocked; try{ btcUnlocked=false; applyThemeFromDuration(); Math.random=()=>0.9; const cw0=cw, ccw0=ccw; step(); console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc'); Math.random=()=>0.1; const cw1=cw, ccw1=ccw; step(); console.assert(ccw===ccw1+1 && cw===cw1, 'ccw inc'); durSel.value='21'; applyThemeFromDuration(); console.assert(ring.classList.contains('btc'), 'btc on 21'); durSel.value='1'; applyThemeFromDuration(); console.assert(!ring.classList.contains('btc'), 'btc off'); const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]); console.assert(csv.startsWith('time,'),'csv header'); console.assert(csv.indexOf('\n')!==-1,'csv newline'); cw=5; ccw=5; hits=5; misses=5; showSummary(); console.assert(saveBtn.disabled===false,'save enabled') } catch(e){ console.warn('tests failed', e) } finally { btcUnlocked=unlockPrev; applyThemeFromDuration(); Math.random=orig; resetExp() } }
+
+loadSessions(); loadBtcUnlock(); updateSessionList(); init(); runTests();
 </script>
 </body>
 </html>
