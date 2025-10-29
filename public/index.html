@@ -8,12 +8,15 @@
   /* EDIT: CONFIG (Farben, Look & Größen) */
   :root{
     --bg:#0b0f10; --text:#e8ebec; --muted:#b9c2c6;
-    --ok:#7cff6b; --ok-soft:rgba(124,255,107,.6);
-    --bad:#ff6b6b; --bad-soft:rgba(255,107,107,.6);
+    --ok:#6dff65; --ok-soft:rgba(109,255,101,.45);
+    --bad:#ff6b6b; --bad-soft:rgba(255,107,107,.55);
     --btc:#F7931A; /* Bitcoin-Orange für 21‑Minuten-Thema */
     --sep:rgba(255,255,255,.08); /* Block‑Trennlinie */
-    --dot:#e8ebec; /* Inaktive Punkte: hellgrau, fast weiss */
-    --ring-size:420px; /* Gesamtdurchmesser des Rads */
+    --dot:#e1e5e9; /* Inaktive Punkte: hellgrau, fast weiss */
+    --ring-bg:#06090d;
+    --ring-border:#1b2126;
+    --infinity:#ff7a1a;
+    --ring-size:360px; /* Gesamtdurchmesser des Rads */
     --symbol-size:132px; /* ∞ / ₿ mittig */
   }
   /* /EDIT: CONFIG (Farben, Look & Größen) */
@@ -46,28 +49,27 @@
   button:hover{background:rgba(255,255,255,.10)}
 
   /* Ring */
-  .ringWrap{display:grid;place-items:center;margin-top:10px}
-  .ring{position:relative;width:var(--ring-size);aspect-ratio:1/1;border-radius:50%;background:#121719;box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),0 0 8px rgba(255,255,255,.06)}
-  .ring:not(.btc){animation:ringPulse 8s ease-in-out infinite}
+  .ringWrap{display:grid;place-items:center;margin:24px 0}
+  .ring{position:relative;width:var(--ring-size);aspect-ratio:1/1;border-radius:50%;background:var(--ring-bg);border:6px solid var(--ring-border);box-shadow:none;overflow:visible}
+  .ring::before{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;box-shadow:none;opacity:0}
   /* Symbol (ASCII‑safe via Unicode‑Escape) */
-  .ring::after{content:"\221E";position:absolute;inset:0;display:grid;place-items:center;font-size:var(--symbol-size);color:rgba(255,255,255,.14)}
+  .ring::after{content:"\221E";position:absolute;inset:0;display:grid;place-items:center;font-size:var(--symbol-size);color:var(--infinity);font-weight:600;letter-spacing:-6px}
   /* EDIT: THEME (Bitcoin bei 21 Minuten) */
-  .ring.btc{background:var(--btc);box-shadow:inset 0 0 0 3px #F7931A,0 0 32px rgba(247,147,26,.55);animation:none}
+  .ring.btc{background:var(--btc);box-shadow:inset 0 0 0 3px #F7931A,0 0 32px rgba(247,147,26,.55)}
+  .ring.btc::before{opacity:0;animation:none}
   .ring.btc::after{content:"\20BF";color:#fff;font-size:var(--symbol-size);font-weight:900;transform:rotate(12deg);
                    text-shadow:0 0 20px rgba(255,255,255,.35),1px 0 0 rgba(255,255,255,.85),-1px 0 0 rgba(255,255,255,.85),0 1px 0 rgba(255,255,255,.85),0 -1px 0 rgba(255,255,255,.85)}
   /* /EDIT: THEME */
   @keyframes ringPulse{
-    0%,100%{box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),0 0 8px rgba(255,255,255,.06)}
-    50%{box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),0 0 18px rgba(255,255,255,.18)}
+    0%,100%{box-shadow:0 0 18px rgba(255,255,255,.24),0 0 58px rgba(255,255,255,.1)}
+    50%{box-shadow:0 0 28px rgba(255,255,255,.34),0 0 86px rgba(255,255,255,.14)}
   }
 
   /* Punkte: 20% grösser, näher am Zentrum (via JS‑Radius) */
-  .dot{position:absolute;width:44px;height:44px;border-radius:50%;background:var(--dot);transform:translate(-50%,-50%);z-index:2}
-  .marker{position:absolute;width:48px;height:48px;border-radius:50%;transform:translate(-50%,-50%);z-index:3;
-          background:radial-gradient(circle at 40% 38%,#fff 10%,var(--ok) 40%,rgba(124,255,107,.85) 70%,rgba(124,255,107,0) 72%);
-          box-shadow:0 0 20px var(--ok-soft);transition:background .15s,box-shadow .15s}
-  .marker.hit{background:radial-gradient(circle at 40% 38%,#fff 10%,var(--ok) 40%,rgba(124,255,107,.85) 70%,rgba(124,255,107,0) 72%);box-shadow:0 0 20px var(--ok-soft)}
-  .marker.miss{background:radial-gradient(circle at 40% 38%,#fff 10%,var(--bad) 40%,rgba(255,107,107,.85) 70%,rgba(255,107,107,0) 72%);box-shadow:0 0 20px var(--bad-soft)}
+  .dot{position:absolute;width:38px;height:38px;border-radius:50%;background:var(--dot);transform:translate(-50%,-50%);z-index:2;box-shadow:0 0 0 6px var(--ring-bg)}
+  .marker{position:absolute;width:44px;height:44px;border-radius:50%;transform:translate(-50%,-50%);z-index:3;background:var(--ok);box-shadow:0 0 24px var(--ok-soft);transition:background .15s,box-shadow .15s}
+  .marker.hit{background:var(--ok);box-shadow:0 0 28px var(--ok-soft)}
+  .marker.miss{background:var(--bad);box-shadow:0 0 24px var(--bad-soft)}
 
   canvas{width:100%;height:220px;background:rgba(255,255,255,.02);border-radius:12px;border:1px solid rgba(255,255,255,.06)}
   .note{text-align:center;color:#b7c1c5;margin-top:10px}
@@ -178,14 +180,13 @@
 <script>
 // EDIT: CONFIG (Konstanten anpassen)
 const N = 16;           // Anzahl Felder (fix)
-const RADIUS = 161;     // 30% naehere Platzierung der Punkte zum Rand
+const RADIUS = Math.round(120 * 1.3); // Punkte ca. 30% naeher zum Rand
 const TRAIL_LEN = 6;    // Laenge der Trail‑Spur (optisch)
 // /EDIT: CONFIG
 
 // State & Elemente
 let pos=0, steps=0, cw=0, ccw=0, hits=0, misses=0;
 let trail=[], hist=[], running=false, endAt=0, interval=800, timer=null, focusDir=1;
-let ringTapCount=0, btcUnlocked=false;
 const ring = document.getElementById('ring');
 const startSel = document.getElementById('start');
 const durSel = document.getElementById('duration');
@@ -202,9 +203,53 @@ const storageNoteEl = document.getElementById('storageNote');
 const sessionListEl = document.getElementById('sessionList');
 const clearSessionsBtn = document.getElementById('clearSessions');
 
+const BTC_OVERRIDE_KEY='pke7g_btc_override';
+let btcOverride=false;
+let ringTapCount=0;
+
+function persistBtcOverride(enabled){
+  let stored=false;
+  try{ localStorage.setItem(BTC_OVERRIDE_KEY, enabled?'1':'0'); stored=true }catch(e){}
+  if(!stored){
+    try{ sessionStorage.setItem(BTC_OVERRIDE_KEY, enabled?'1':'0'); stored=true }catch(e){}
+  }
+  return stored;
+}
+
+function loadBtcOverride(){
+  try{ const v=localStorage.getItem(BTC_OVERRIDE_KEY); if(v!==null){ btcOverride=v==='1'; ringTapCount=btcOverride?21:0; return } }catch(e){}
+  try{ const v=sessionStorage.getItem(BTC_OVERRIDE_KEY); if(v!==null){ btcOverride=v==='1'; ringTapCount=btcOverride?21:0; return } }catch(e){}
+  btcOverride=false;
+  ringTapCount=0;
+}
+
+function activateBtcOverride(){
+  if(btcOverride) return;
+  btcOverride=true;
+  ringTapCount=21;
+  persistBtcOverride(true);
+  applyThemeFromDuration();
+}
+
+function handleRingPointer(e){
+  if(btcOverride) return;
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  const rect=ring.getBoundingClientRect();
+  const x=e.clientX-rect.left;
+  const y=e.clientY-rect.top;
+  const dx=x-rect.width/2;
+  const dy=y-rect.height/2;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<=rect.width/2){
+    ringTapCount=Math.min(ringTapCount+1,21);
+    if(ringTapCount===21){
+      activateBtcOverride();
+    }
+  }
+}
+
 // Storage
 const SKEY='pke7g_sessions_v2';
-const BTC_UNLOCK_KEY='pke7g_btc_unlock';
 let sessions=[], lastStats=null;
 function loadSessions(){ try{ const s=localStorage.getItem(SKEY); sessions=s?JSON.parse(s):[] }catch(e){ sessions=[]; storageNoteEl.textContent='Lokaler Speicher nicht verfuegbar. Bitte exportieren.' } }
 function persistSessions(){ try{ localStorage.setItem(SKEY, JSON.stringify(sessions)); storageNoteEl.textContent=''; return true }catch(e){ storageNoteEl.textContent='Speicher voll/blockiert. Export empfohlen.'; return false } }
@@ -217,8 +262,14 @@ sessionListEl.addEventListener('click', (e)=>{ const btn=e.target.closest('butto
 
 // Init UI
 function init(){ startSel.innerHTML=''; for(let i=0;i<N;i++){ const o=document.createElement('option'); o.value=i; o.textContent='Feld '+(i+1); startSel.appendChild(o) } buildRing(); applyThemeFromDuration() }
-function buildRing(){ ring.innerHTML=''; const marker=document.createElement('div'); marker.id='marker'; marker.className='marker'; ring.appendChild(marker); const r=RADIUS, cx=210, cy=210; for(let i=0;i<N;i++){ const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; d.style.left=x+'px'; d.style.top=y+'px'; ring.appendChild(d) } placeMarker(pos) }
-function placeMarker(i){ const m=document.getElementById('marker'); const r=RADIUS, cx=210, cy=210; const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); m.style.left=x+'px'; m.style.top=y+'px' }
+function getRingCenter(){
+  const styles=getComputedStyle(ring);
+  const width=ring.clientWidth||Number.parseFloat(styles.width)||ring.offsetWidth||0;
+  const height=ring.clientHeight||Number.parseFloat(styles.height)||width;
+  return { cx: width/2, cy: height/2 };
+}
+function buildRing(){ ring.innerHTML=''; const marker=document.createElement('div'); marker.id='marker'; marker.className='marker'; ring.appendChild(marker); const r=RADIUS; const {cx,cy}=getRingCenter(); for(let i=0;i<N;i++){ const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; d.style.left=x+'px'; d.style.top=y+'px'; ring.appendChild(d) } placeMarker(pos) }
+function placeMarker(i){ const m=document.getElementById('marker'); const r=RADIUS; const {cx,cy}=getRingCenter(); const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); m.style.left=x+'px'; m.style.top=y+'px' }
 
 function step(){ const dir=Math.random()<0.5?-1:1; pos=(pos+dir+N)%N; steps++; if(dir===1) cw++; else ccw++; hist.push(dir); const marker=document.getElementById('marker'); const hit=(dir===focusDir); if(hit){ hits++; marker.className='marker hit' } else { misses++; marker.className='marker miss' } placeMarker(pos) }
 function loop(){ if(!running) return; const now=Date.now(); if(now>=endAt){ stopExp(); return } step(); timer=requestAnimationFrame(()=> setTimeout(loop, interval)) }
@@ -227,8 +278,8 @@ function stopExp(){ running=false; toggleBtn.textContent='Experiment starten'; d
 function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; saveBtn.disabled=true; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
-function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const useBTC = btcUnlocked || is21; ring.classList.toggle('btc', useBTC) }
-// /EDIT: THEME-LOGIK
+function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; ring.classList.toggle('btc', is21 || btcOverride) }
+// /EDIT: THEME‑LOGIK
 
 // Chart & Stats
 function drawChart(){ const ctx=chart.getContext('2d'); const W=chart.width=chart.clientWidth*2, H=chart.height=chart.clientHeight*2; const pad=40, w=W-2*pad, h=H-2*pad; ctx.clearRect(0,0,W,H); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pad, pad+h/2); ctx.lineTo(pad+w, pad+h/2); ctx.stroke(); let cum=0; ctx.beginPath(); ctx.lineWidth=3; ctx.strokeStyle='rgba(124,255,107,.9)'; for(let i=0;i<hist.length;i++){ cum += hist[i]; const x=pad + (i/(hist.length-1||1))*w; const y=pad + h/2 - (cum/Math.sqrt(hist.length||1))*(h/2*0.9); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y) } ctx.stroke() }
@@ -239,25 +290,23 @@ function currentSessionRecord(){ const duration=Number(durSel.value)||0; const s
 
 // Events
 toggleBtn.onclick = ()=> running ? stopExp() : startExp();
-resetBtn.onclick = ()=>{ clearBtcUnlock(); resetExp(); };
+resetBtn.onclick = resetExp;
 durSel.onchange = applyThemeFromDuration;
 focusSel.onchange = (e)=>{ focusDir=(e.target.value==='cw')?1:-1 };
 saveBtn.onclick = ()=>{ const rec=currentSessionRecord(); sessions.push(rec); if(!persistSessions()){ makeDownload('session-lokal.json','application/json', JSON.stringify(rec, null, 2)) } updateSessionList(); if(sessions.length>=200){ storageNoteEl.textContent='Viele Sessions gespeichert - bitte regelmaessig exportieren.' } };
 exportJSONBtn.onclick = exportAllJSON;
 exportCSVBtn.onclick = exportAllCSV;
 clearSessionsBtn.onclick = ()=>{ if(confirm('Alle gespeicherten Sessions loeschen?')){ sessions=[]; persistSessions(); updateSessionList() } };
-
-// BTC Unlock (21 Taps)
-function loadBtcUnlock(){ try{ btcUnlocked = localStorage.getItem(BTC_UNLOCK_KEY)==='1' }catch(e){ btcUnlocked=false } }
-function persistBtcUnlock(){ try{ if(btcUnlocked){ localStorage.setItem(BTC_UNLOCK_KEY,'1') } else { localStorage.removeItem(BTC_UNLOCK_KEY) } }catch(e){} }
-function clearBtcUnlock(){ btcUnlocked=false; ringTapCount=0; persistBtcUnlock(); applyThemeFromDuration(); }
-function registerRingTap(){ if(btcUnlocked) return; ringTapCount++; if(ringTapCount>=21){ btcUnlocked=true; ringTapCount=0; persistBtcUnlock(); applyThemeFromDuration() } }
-ring.addEventListener('pointerdown', registerRingTap);
+ring.addEventListener('pointerdown', handleRingPointer);
 
 // Tests (Konsole, optional)
-function runTests(){ const orig=Math.random; const unlockPrev=btcUnlocked; try{ btcUnlocked=false; applyThemeFromDuration(); Math.random=()=>0.9; const cw0=cw, ccw0=ccw; step(); console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc'); Math.random=()=>0.1; const cw1=cw, ccw1=ccw; step(); console.assert(ccw===ccw1+1 && cw===cw1, 'ccw inc'); durSel.value='21'; applyThemeFromDuration(); console.assert(ring.classList.contains('btc'), 'btc on 21'); durSel.value='1'; applyThemeFromDuration(); console.assert(!ring.classList.contains('btc'), 'btc off'); const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]); console.assert(csv.startsWith('time,'),'csv header'); console.assert(csv.indexOf('\n')!==-1,'csv newline'); cw=5; ccw=5; hits=5; misses=5; showSummary(); console.assert(saveBtn.disabled===false,'save enabled') } catch(e){ console.warn('tests failed', e) } finally { btcUnlocked=unlockPrev; persistBtcUnlock(); applyThemeFromDuration(); Math.random=orig; resetExp() } }
+function runTests(){ const orig=Math.random; try{ Math.random=()=>0.9; const cw0=cw, ccw0=ccw; step(); console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc'); Math.random=()=>0.1; const cw1=cw, ccw1=ccw; step(); console.assert(ccw===ccw1+1 && cw===ccw1, 'ccw inc'); const originalDur=durSel.value; const hadOverride=btcOverride; durSel.value='21'; applyThemeFromDuration(); console.assert(ring.classList.contains('btc'), 'btc on 21'); durSel.value='1'; applyThemeFromDuration(); if(!hadOverride){ console.assert(!ring.classList.contains('btc'), 'btc off') } const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]); console.assert(csv.startsWith('time,'),'csv header'); console.assert(csv.indexOf('\n')!==-1,'csv newline'); cw=5; ccw=5; hits=5; misses=5; showSummary(); console.assert(saveBtn.disabled===false,'save enabled'); durSel.value=originalDur; applyThemeFromDuration() } catch(e){ console.warn('tests failed', e) } finally { Math.random=orig; resetExp() } }
 
-loadSessions(); loadBtcUnlock(); updateSessionList(); init(); runTests();
+loadBtcOverride();
+loadSessions();
+updateSessionList();
+init();
+runTests();
 </script>
 </body>
 </html>
