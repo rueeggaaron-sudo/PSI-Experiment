@@ -262,8 +262,13 @@ sessionListEl.addEventListener('click', (e)=>{ const btn=e.target.closest('butto
 
 // Init UI
 function init(){ startSel.innerHTML=''; for(let i=0;i<N;i++){ const o=document.createElement('option'); o.value=i; o.textContent='Feld '+(i+1); startSel.appendChild(o) } buildRing(); applyThemeFromDuration() }
-function buildRing(){ ring.innerHTML=''; const marker=document.createElement('div'); marker.id='marker'; marker.className='marker'; ring.appendChild(marker); const r=RADIUS, cx=210, cy=210; for(let i=0;i<N;i++){ const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; d.style.left=x+'px'; d.style.top=y+'px'; ring.appendChild(d) } placeMarker(pos) }
-function placeMarker(i){ const m=document.getElementById('marker'); const r=RADIUS, cx=210, cy=210; const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); m.style.left=x+'px'; m.style.top=y+'px' }
+function getRingCenter(){
+  const width=ring.clientWidth||ring.offsetWidth||Number.parseFloat(getComputedStyle(ring).width)||0;
+  const height=ring.clientHeight||ring.offsetHeight||width;
+  return { cx: width/2, cy: height/2 };
+}
+function buildRing(){ ring.innerHTML=''; const marker=document.createElement('div'); marker.id='marker'; marker.className='marker'; ring.appendChild(marker); const r=RADIUS; const {cx,cy}=getRingCenter(); for(let i=0;i<N;i++){ const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; d.style.left=x+'px'; d.style.top=y+'px'; ring.appendChild(d) } placeMarker(pos) }
+function placeMarker(i){ const m=document.getElementById('marker'); const r=RADIUS; const {cx,cy}=getRingCenter(); const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); m.style.left=x+'px'; m.style.top=y+'px' }
 
 function step(){ const dir=Math.random()<0.5?-1:1; pos=(pos+dir+N)%N; steps++; if(dir===1) cw++; else ccw++; hist.push(dir); const marker=document.getElementById('marker'); const hit=(dir===focusDir); if(hit){ hits++; marker.className='marker hit' } else { misses++; marker.className='marker miss' } placeMarker(pos) }
 function loop(){ if(!running) return; const now=Date.now(); if(now>=endAt){ stopExp(); return } step(); timer=requestAnimationFrame(()=> setTimeout(loop, interval)) }
