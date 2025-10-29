@@ -8,12 +8,15 @@
   /* EDIT: CONFIG (Farben, Look & Größen) */
   :root{
     --bg:#0b0f10; --text:#e8ebec; --muted:#b9c2c6;
-    --ok:#7cff6b; --ok-soft:rgba(124,255,107,.6);
-    --bad:#ff6b6b; --bad-soft:rgba(255,107,107,.6);
+    --ok:#6dff65; --ok-soft:rgba(109,255,101,.45);
+    --bad:#ff6b6b; --bad-soft:rgba(255,107,107,.55);
     --btc:#F7931A; /* Bitcoin-Orange für 21‑Minuten-Thema */
     --sep:rgba(255,255,255,.08); /* Block‑Trennlinie */
-    --dot:#e8ebec; /* Inaktive Punkte: hellgrau, fast weiss */
-    --ring-size:420px; /* Gesamtdurchmesser des Rads */
+    --dot:#e1e5e9; /* Inaktive Punkte: hellgrau, fast weiss */
+    --ring-bg:#06090d;
+    --ring-border:#1b2126;
+    --infinity:#ff7a1a;
+    --ring-size:360px; /* Gesamtdurchmesser des Rads */
     --symbol-size:132px; /* ∞ / ₿ mittig */
   }
   /* /EDIT: CONFIG (Farben, Look & Größen) */
@@ -46,11 +49,11 @@
   button:hover{background:rgba(255,255,255,.10)}
 
   /* Ring */
-  .ringWrap{display:grid;place-items:center;margin-top:10px}
-  .ring{position:relative;width:var(--ring-size);aspect-ratio:1/1;border-radius:50%;background:#121719;box-shadow:inset 0 0 0 2px rgba(255,255,255,.05);overflow:visible}
-  .ring::before{content:"";position:absolute;inset:-14px;border-radius:50%;pointer-events:none;box-shadow:0 0 18px rgba(255,255,255,.28),0 0 64px rgba(255,255,255,.12);opacity:.7;animation:ringPulse 10s ease-in-out infinite}
+  .ringWrap{display:grid;place-items:center;margin:24px 0}
+  .ring{position:relative;width:var(--ring-size);aspect-ratio:1/1;border-radius:50%;background:var(--ring-bg);border:6px solid var(--ring-border);box-shadow:none;overflow:visible}
+  .ring::before{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;box-shadow:none;opacity:0}
   /* Symbol (ASCII‑safe via Unicode‑Escape) */
-  .ring::after{content:"\221E";position:absolute;inset:0;display:grid;place-items:center;font-size:var(--symbol-size);color:rgba(255,255,255,.14)}
+  .ring::after{content:"\221E";position:absolute;inset:0;display:grid;place-items:center;font-size:var(--symbol-size);color:var(--infinity);font-weight:600;letter-spacing:-6px}
   /* EDIT: THEME (Bitcoin bei 21 Minuten) */
   .ring.btc{background:var(--btc);box-shadow:inset 0 0 0 3px #F7931A,0 0 32px rgba(247,147,26,.55)}
   .ring.btc::before{opacity:0;animation:none}
@@ -63,12 +66,10 @@
   }
 
   /* Punkte: 20% grösser, näher am Zentrum (via JS‑Radius) */
-  .dot{position:absolute;width:44px;height:44px;border-radius:50%;background:var(--dot);transform:translate(-50%,-50%);z-index:2}
-  .marker{position:absolute;width:48px;height:48px;border-radius:50%;transform:translate(-50%,-50%);z-index:3;
-          background:radial-gradient(circle at 40% 38%,#fff 10%,var(--ok) 40%,rgba(124,255,107,.85) 70%,rgba(124,255,107,0) 72%);
-          box-shadow:0 0 20px var(--ok-soft);transition:background .15s,box-shadow .15s}
-  .marker.hit{background:radial-gradient(circle at 40% 38%,#fff 10%,var(--ok) 40%,rgba(124,255,107,.85) 70%,rgba(124,255,107,0) 72%);box-shadow:0 0 20px var(--ok-soft)}
-  .marker.miss{background:radial-gradient(circle at 40% 38%,#fff 10%,var(--bad) 40%,rgba(255,107,107,.85) 70%,rgba(255,107,107,0) 72%);box-shadow:0 0 20px var(--bad-soft)}
+  .dot{position:absolute;width:38px;height:38px;border-radius:50%;background:var(--dot);transform:translate(-50%,-50%);z-index:2;box-shadow:0 0 0 6px var(--ring-bg)}
+  .marker{position:absolute;width:44px;height:44px;border-radius:50%;transform:translate(-50%,-50%);z-index:3;background:var(--ok);box-shadow:0 0 24px var(--ok-soft);transition:background .15s,box-shadow .15s}
+  .marker.hit{background:var(--ok);box-shadow:0 0 28px var(--ok-soft)}
+  .marker.miss{background:var(--bad);box-shadow:0 0 24px var(--bad-soft)}
 
   canvas{width:100%;height:220px;background:rgba(255,255,255,.02);border-radius:12px;border:1px solid rgba(255,255,255,.06)}
   .note{text-align:center;color:#b7c1c5;margin-top:10px}
@@ -179,7 +180,7 @@
 <script>
 // EDIT: CONFIG (Konstanten anpassen)
 const N = 16;           // Anzahl Felder (fix)
-const RADIUS = Math.round(140 * 1.3); // Punkte ca. 30% naeher zum Rand
+const RADIUS = Math.round(120 * 1.3); // Punkte ca. 30% naeher zum Rand
 const TRAIL_LEN = 6;    // Laenge der Trail‑Spur (optisch)
 // /EDIT: CONFIG
 
