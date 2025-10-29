@@ -266,6 +266,8 @@ function getRingCenter(){
   const styles=getComputedStyle(ring);
   const width=ring.clientWidth||Number.parseFloat(styles.width)||ring.offsetWidth||0;
   const height=ring.clientHeight||Number.parseFloat(styles.height)||width;
+  const width=ring.clientWidth||ring.offsetWidth||Number.parseFloat(getComputedStyle(ring).width)||0;
+  const height=ring.clientHeight||ring.offsetHeight||width;
   return { cx: width/2, cy: height/2 };
 }
 function buildRing(){ ring.innerHTML=''; const marker=document.createElement('div'); marker.id='marker'; marker.className='marker'; ring.appendChild(marker); const r=RADIUS; const {cx,cy}=getRingCenter(); for(let i=0;i<N;i++){ const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; d.style.left=x+'px'; d.style.top=y+'px'; ring.appendChild(d) } placeMarker(pos) }
