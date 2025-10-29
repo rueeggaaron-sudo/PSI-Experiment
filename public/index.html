@@ -310,3 +310,16 @@ runTests();
 </script>
 </body>
 </html>
+<script>
+async function submitExperimentData(rec){
+  const consent = JSON.parse(localStorage.getItem('exp-upload-ok')||'false');
+  if(!consent) return; // kein Upload ohne Zustimmung
+  try{
+    await fetch('/api/exp/submit', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify(rec)
+    });
+  }catch(e){ console.warn('Experiment upload failed', e); }
+}
+</script>
