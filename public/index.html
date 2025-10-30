@@ -72,6 +72,18 @@
   .marker.hit{background:var(--ok);box-shadow:0 0 28px var(--ok-soft)}
   .marker.miss{background:var(--bad);box-shadow:0 0 24px var(--bad-soft)}
 
+  .badge{display:inline-block;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:600;margin-left:10px;color:#0b0f10}
+  .badge.tier-random{background:rgba(180,190,200,.6);color:#0b0f10}
+  .badge.tier-mild{background:rgba(247,200,88,.7);color:#0b0f10}
+  .badge.tier-noticeable{background:rgba(255,159,67,.75);color:#0b0f10}
+  .badge.tier-strong{background:rgba(255,110,57,.8);color:#0b0f10}
+  .badge.tier-extreme{background:rgba(210,35,35,.85);color:#fff}
+
+  .summary-note{display:block;font-size:13px;color:var(--muted);margin-top:6px}
+
+  .chart-tooltip{position:fixed;z-index:10;background:rgba(12,18,22,.92);color:#fff;padding:8px 12px;border-radius:8px;font-size:13px;pointer-events:none;box-shadow:0 8px 18px rgba(0,0,0,.35);opacity:0;transition:opacity .15s}
+  .chart-tooltip.visible{opacity:1}
+
   canvas{width:100%;height:220px;background:rgba(255,255,255,.02);border-radius:12px;border:1px solid rgba(255,255,255,.06)}
   .note{text-align:center;color:#b7c1c5;margin-top:10px}
 
@@ -211,8 +223,15 @@ const storageNoteEl = document.getElementById('storageNote');
 const sessionListEl = document.getElementById('sessionList');
 const clearSessionsBtn = document.getElementById('clearSessions');
 
+const chartTooltip=document.createElement('div');
+chartTooltip.className='chart-tooltip';
+chartTooltip.setAttribute('aria-hidden','true');
+document.body.appendChild(chartTooltip);
+
 let btcClicks=0, btcOverride=false;
 let autoSavePromptShown=false;
+let chartHoverData=null;
+let chartHoverHighlight=null;
 
 function loadBtcOverride(){
   btcOverride=false;
@@ -319,17 +338,272 @@ function stopExp(autoTriggered=false){
   const uploadPayload=makeUploadPayload(endedAt);
   if(uploadPayload) submitExperimentData(uploadPayload);
 }
-function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
+function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; chartHoverHighlight=null; chartHoverData=null; chartTooltip.classList.remove('visible'); chartTooltip.setAttribute('aria-hidden','true'); pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
 function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const hasOverride=btcOverride===true; ring.classList.toggle('btc', is21 || hasOverride) }
 // /EDIT: THEME‑LOGIK
 
 // Chart & Stats
-function drawChart(){ const ctx=chart.getContext('2d'); const W=chart.width=chart.clientWidth*2, H=chart.height=chart.clientHeight*2; const pad=40, w=W-2*pad, h=H-2*pad; ctx.clearRect(0,0,W,H); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pad, pad+h/2); ctx.lineTo(pad+w, pad+h/2); ctx.stroke(); let cum=0; ctx.beginPath(); ctx.lineWidth=3; ctx.strokeStyle='rgba(124,255,107,.9)'; for(let i=0;i<hist.length;i++){ cum += hist[i]; const x=pad + (i/(hist.length-1||1))*w; const y=pad + h/2 - (cum/Math.sqrt(hist.length||1))*(h/2*0.9); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y) } ctx.stroke() }
+function drawChart(){
+  const ctx=chart.getContext('2d');
+  const cssW=chart.clientWidth||400;
+  const cssH=chart.clientHeight||220;
+  const W=chart.width=cssW*2;
+  const H=chart.height=cssH*2;
+  const pad=56;
+  const w=W-2*pad;
+  const h=H-2*pad;
+  ctx.clearRect(0,0,W,H);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.lineJoin='round';
+  ctx.lineCap='round';
+  ctx.font='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+  ctx.fillStyle='rgba(235,239,242,.8)';
+
+  const stepsCount=hist.length;
+  const cumulative=[0];
+  let runningTotal=0;
+  for(let i=0;i<stepsCount;i++){
+    runningTotal += hist[i];
+    cumulative.push(runningTotal);
+  }
+
+  const outerBand=Math.max(1.96*Math.sqrt(stepsCount||1),1);
+  let maxAbs=outerBand;
+  for(let i=0;i<cumulative.length;i++){
+    const val=Math.abs(cumulative[i]);
+    if(val>maxAbs) maxAbs=val;
+  }
+  const scale=Math.max(maxAbs,1);
+  const midY=pad + h/2;
+
+  const indexToX = (idx)=> pad + (stepsCount ? (idx/stepsCount)*w : 0);
+  const valueToY = (val)=> midY - (val/scale)*(h/2*0.95);
+
+  ctx.strokeStyle='rgba(200,205,210,0.45)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(pad, pad-12);
+  ctx.lineTo(pad, pad+h+12);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(pad-12, pad+h);
+  ctx.lineTo(pad+w+12, pad+h);
+  ctx.stroke();
+
+  ctx.fillStyle='rgba(235,239,242,.85)';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText('Schritte', pad + w/2, pad+h + 40);
+  ctx.save();
+  ctx.translate(pad-44, pad + h/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText('Kumulierte Tendenz', 0, 0);
+  ctx.restore();
+
+  ctx.strokeStyle='rgba(160,170,180,0.55)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(pad, midY);
+  ctx.lineTo(pad+w, midY);
+  ctx.stroke();
+
+  ctx.globalAlpha=1;
+  const drawBand=(multiplier, fillStyle)=>{
+    if(!stepsCount) return;
+    ctx.beginPath();
+    ctx.moveTo(indexToX(0), valueToY(multiplier*Math.sqrt(0)));
+    for(let i=1;i<=stepsCount;i++){
+      ctx.lineTo(indexToX(i), valueToY(multiplier*Math.sqrt(i)));
+    }
+    for(let i=stepsCount;i>=0;i--){
+      ctx.lineTo(indexToX(i), valueToY(-multiplier*Math.sqrt(i)));
+    }
+    ctx.closePath();
+    ctx.fillStyle=fillStyle;
+    ctx.fill();
+  };
+  drawBand(1.96,'rgba(124,180,255,0.1)');
+  drawBand(1,'rgba(124,255,107,0.10)');
+
+  ctx.strokeStyle='rgba(124,255,107,0.9)';
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(indexToX(0), valueToY(0));
+  for(let i=1;i<=stepsCount;i++){
+    ctx.lineTo(indexToX(i), valueToY(cumulative[i]));
+  }
+  ctx.stroke();
+
+  if(stepsCount){
+    ctx.fillStyle='rgba(124,255,107,0.95)';
+    const lastX=indexToX(stepsCount);
+    const lastY=valueToY(cumulative[cumulative.length-1]);
+    ctx.beginPath();
+    ctx.arc(lastX,lastY,6,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  const legendWidth=Math.min(360, Math.max(220, w*0.5));
+  const legendHeight=120;
+  const legendX=pad + w - legendWidth - 12;
+  const legendY=pad + 12;
+  ctx.fillStyle='rgba(10,14,18,0.75)';
+  ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
+  ctx.strokeStyle='rgba(255,255,255,0.08)';
+  ctx.strokeRect(legendX, legendY, legendWidth, legendHeight);
+  ctx.fillStyle='rgba(235,239,242,.9)';
+  ctx.textAlign='left';
+  ctx.textBaseline='middle';
+  ctx.font='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+
+  const legendItems=[
+    {label:'Kumulierte Tendenz', type:'line', color:'rgba(124,255,107,0.9)'},
+    {label:'Null-Linie', type:'line', color:'rgba(160,170,180,0.55)'},
+    {label:'Zufallsbereich', type:'fill', color:'rgba(124,180,255,0.35)'}
+  ];
+  const legendLineX=legendX+24;
+  let legendRowY=legendY+28;
+  legendItems.forEach(item=>{
+    if(item.type==='line'){
+      ctx.strokeStyle=item.color;
+      ctx.lineWidth=4;
+      ctx.beginPath();
+      ctx.moveTo(legendLineX, legendRowY);
+      ctx.lineTo(legendLineX+54, legendRowY);
+      ctx.stroke();
+    }else if(item.type==='fill'){
+      ctx.fillStyle=item.color;
+      ctx.fillRect(legendLineX, legendRowY-10, 54, 20);
+    }
+    ctx.fillStyle='rgba(235,239,242,.9)';
+    ctx.fillText(item.label, legendLineX+72, legendRowY);
+    legendRowY+=34;
+  });
+
+  chartHoverData={
+    points:[],
+    scaleX:W/(chart.getBoundingClientRect().width||cssW),
+    scaleY:H/(chart.getBoundingClientRect().height||cssH),
+    indexToX,
+    valueToY
+  };
+  for(let i=1;i<=stepsCount;i++){
+    chartHoverData.points.push({
+      x:indexToX(i),
+      y:valueToY(cumulative[i]),
+      idx:i,
+      value:cumulative[i],
+      dir:hist[i-1]===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'
+    });
+  }
+  if(!stepsCount){
+    chartHoverData.points=[];
+  }
+  if(chartHoverHighlight){
+    const match=chartHoverData.points.find(p=>p.idx===chartHoverHighlight.idx);
+    if(match){
+      ctx.strokeStyle='rgba(255,255,255,0.9)';
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.arc(match.x, match.y,12,0,Math.PI*2);
+      ctx.stroke();
+    }
+  }
+}
+
+function setChartHighlight(idx){
+  const current=chartHoverHighlight ? chartHoverHighlight.idx : null;
+  if(current===idx) return;
+  chartHoverHighlight = (typeof idx==='number') ? {idx} : null;
+  drawChart();
+}
+
+function hideChartTooltip(){
+  if(chartTooltip.classList.contains('visible')){
+    chartTooltip.classList.remove('visible');
+    chartTooltip.setAttribute('aria-hidden','true');
+  }
+  if(chartHoverHighlight){
+    chartHoverHighlight=null;
+    drawChart();
+  }
+}
+
+function handleChartHover(evt){
+  if(!chartHoverData || !chartHoverData.points.length){
+    hideChartTooltip();
+    return;
+  }
+  const rect=chart.getBoundingClientRect();
+  const touch=evt.touches && evt.touches[0];
+  const clientX=touch ? touch.clientX : evt.clientX;
+  const clientY=touch ? touch.clientY : evt.clientY;
+  const canvasX=(clientX - rect.left)*chartHoverData.scaleX;
+  if(!isFinite(canvasX)){
+    hideChartTooltip();
+    return;
+  }
+  let nearest=null;
+  let minDist=Infinity;
+  for(const point of chartHoverData.points){
+    const dist=Math.abs(point.x - canvasX);
+    if(dist<minDist){
+      minDist=dist;
+      nearest=point;
+    }
+  }
+  if(!nearest){
+    hideChartTooltip();
+    return;
+  }
+  const targetIdx=nearest.idx;
+  setChartHighlight(targetIdx);
+  const refreshed=chartHoverData && chartHoverData.points.find(p=>p.idx===targetIdx);
+  if(!refreshed){
+    hideChartTooltip();
+    return;
+  }
+  chartTooltip.innerHTML=`<strong>Schritt ${refreshed.idx}</strong><br>Kumuliert: ${refreshed.value.toFixed(2)}<br>Richtung: ${refreshed.dir}`;
+  chartTooltip.style.left=`${clientX+16}px`;
+  chartTooltip.style.top=`${clientY+16}px`;
+  chartTooltip.classList.add('visible');
+  chartTooltip.setAttribute('aria-hidden','false');
+}
 function erf(x){ const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911; const sign=x<0?-1:1; x=Math.abs(x); const t=1/(1+p*x); const y=1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x); return sign*y }
 function pTwoTailFromZ(z){ const phi=0.5*(1+erf(Math.abs(z)/Math.SQRT2)); return 2*(1-phi) }
-function showSummary(){ const total=cw+ccw; const diff=cw-ccw; const z = total? (diff)/Math.sqrt(total) : 0; const p = pTwoTailFromZ(z); const targetTxt=(focusDir===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'); const acc= total? ((hits/total)*100).toFixed(1) : '0.0'; summary.innerHTML='Ziel: <b>'+targetTxt+'</b> - Schritte: <b>'+total+'</b> - Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b><br>'+'Treffer (grün): <b>'+hits+'</b> - Fehl (rot): <b>'+misses+'</b> - Trefferquote: <b>'+acc+'%</b><br>'+'Z-Test (nähere Approximation): z='+z.toFixed(2)+', p~'+(p<0.001?'<'+'0.001':p.toFixed(3)); lastStats={z, p, acc:Number(acc)}; saveBtn.disabled=false }
+function showSummary(){
+  const total=cw+ccw;
+  const diff=cw-ccw;
+  const z = total? (diff)/Math.sqrt(total) : 0;
+  const p = pTwoTailFromZ(z);
+  const targetTxt=(focusDir===1?'Uhrzeigersinn':'Gegenuhrzeigersinn');
+  const acc= total? ((hits/total)*100).toFixed(1) : '0.0';
+
+  const pDisplay = p<0.001 ? '< 0.001' : p.toFixed(3);
+  const tier = (p>=0.10)
+    ? {label:'im Zufallsbereich', cls:'tier-random'}
+    : (p>=0.05)
+      ? {label:'leicht überdurchschnittlich', cls:'tier-mild'}
+      : (p>=0.01)
+        ? {label:'auffällig', cls:'tier-noticeable'}
+        : (p>=0.001)
+          ? {label:'sehr auffällig', cls:'tier-strong'}
+          : {label:'extrem auffällig', cls:'tier-extreme'};
+
+  const lines=[
+    'Ziel: <b>'+targetTxt+'</b> - Schritte: <b>'+total+'</b> - Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b>',
+    'Treffer: <b>'+hits+'</b> - Fehlversuche: <b>'+misses+'</b>',
+    'Trefferquote: <b>'+acc+'%</b>',
+    'Zufalls-Wahrscheinlichkeit (p): <b>'+pDisplay+'</b> <span class="badge '+tier.cls+'">'+tier.label+'</span>',
+    '<span class="summary-note">p &lt; 0.05 → eher nicht nur Zufall. p ≥ 0.05 → Zufallsbereich.</span>'
+  ];
+  summary.innerHTML=lines.join('<br>');
+
+  lastStats={z, p, acc:Number(acc)};
+  saveBtn.disabled=false;
+}
 function currentSessionRecord(){ const duration=Number(durSel.value)||0; const speed=Number(speedInp.value)||0; const focus=(focusSel.value==='cw'?'Uhrzeigersinn':'Gegenuhrzeigersinn'); return { time:new Date().toISOString(), duration, speed, startField:Number(startSel.value)+1, focus, steps:cw+ccw, cw, ccw, hits, misses, z:lastStats?Number(lastStats.z||((cw-ccw)/Math.sqrt((cw+ccw)||1))):((cw-ccw)/Math.sqrt((cw+ccw)||1)), p:lastStats?Number(lastStats.p||0):0 } }
 
 function makeUploadPayload(endTs){
@@ -383,6 +657,11 @@ exportJSONBtn.onclick = exportAllJSON;
 exportCSVBtn.onclick = exportAllCSV;
 clearSessionsBtn.onclick = ()=>{ if(confirm('Alle gespeicherten Sessions löschen?')){ sessions=[]; persistSessions(); updateSessionList() } };
 ring.addEventListener('pointerdown', handleRingPointer);
+chart.addEventListener('mousemove', handleChartHover);
+chart.addEventListener('mouseleave', hideChartTooltip);
+chart.addEventListener('touchmove', handleChartHover);
+chart.addEventListener('touchend', hideChartTooltip);
+chart.addEventListener('touchcancel', hideChartTooltip);
 
 // Tests (Konsole, optional)
 function runTests(){ const orig=Math.random; try{ Math.random=()=>0.9; const cw0=cw, ccw0=ccw; step(); console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc'); Math.random=()=>0.1; const cw1=cw, ccw1=ccw; step(); console.assert(ccw===ccw1+1 && cw===ccw1, 'ccw inc'); const originalDur=durSel.value; const hadOverride=btcOverride; durSel.value='21'; applyThemeFromDuration(); console.assert(ring.classList.contains('btc'), 'btc on 21'); durSel.value='1'; applyThemeFromDuration(); if(!hadOverride){ console.assert(!ring.classList.contains('btc'), 'btc off') } const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]); console.assert(csv.startsWith('time,'),'csv header'); console.assert(csv.indexOf('\n')!==-1,'csv newline'); cw=5; ccw=5; hits=5; misses=5; showSummary(); console.assert(saveBtn.disabled===false,'save enabled'); durSel.value=originalDur; applyThemeFromDuration() } catch(e){ console.warn('tests failed', e) } finally { Math.random=orig; resetExp() } }
