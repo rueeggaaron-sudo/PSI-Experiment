@@ -1,6 +1,6 @@
 import { put } from '@vercel/blob';
 
-export const config = { runtime: 'edge' };
+export const runtime = 'nodejs';
 
 /**
  * Minimal Experiment-Analytics (kein Tracking, keine PII)

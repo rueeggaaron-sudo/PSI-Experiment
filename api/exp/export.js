@@ -1,6 +1,6 @@
 import { list } from '@vercel/blob';
 
-export const config = { runtime: 'edge' };
+export const runtime = 'nodejs';
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UID_RE = /^[a-z0-9]{12,64}$/;
