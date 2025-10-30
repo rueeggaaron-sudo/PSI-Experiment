@@ -80,6 +80,27 @@
   .badge.tier-extreme{background:rgba(210,35,35,.85);color:#fff}
 
   .summary-note{display:block;font-size:13px;color:var(--muted);margin-top:6px}
+  .result-wrap{max-width:980px;margin:0 auto;padding:0 16px}
+  .result-head{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:18px;text-align:center}
+  .result-key{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .result-accuracy{font-size:56px;font-weight:700;line-height:1;color:var(--text)}
+  .result-pwrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;font-size:18px}
+  .result-pvalue{font-weight:600}
+  .result-info{max-width:640px;margin:0;color:var(--muted);font-size:14px}
+  .result-note{margin:0;color:var(--muted);font-size:13px}
+  @media(min-width:768px){
+    .result-key{flex-direction:row;gap:18px}
+    .result-accuracy{font-size:64px}
+  }
+  #chartDetails{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  #chartDetails summary{cursor:pointer;font-weight:600;list-style:none}
+  #chartDetails summary::-webkit-details-marker{display:none}
+  #chartDetails[open] summary{margin-bottom:12px}
+  #chartDetails canvas{margin-top:12px}
+  #summary.note{text-align:left;margin-top:16px}
+  @media(max-width:767px){#summary.note{text-align:center}}
+  .summary-lines{display:grid;gap:6px;font-size:14px}
+  .summary-lines div{color:var(--muted)}
 
   .chart-tooltip{position:fixed;z-index:10;background:rgba(12,18,22,.92);color:#fff;padding:8px 12px;border-radius:8px;font-size:13px;pointer-events:none;box-shadow:0 8px 18px rgba(0,0,0,.35);opacity:0;transition:opacity .15s}
   .chart-tooltip.visible{opacity:1}
@@ -90,10 +111,12 @@
   /* Sessions */
   .actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}
   .actions button[disabled]{opacity:.5;cursor:not-allowed}
-  #sessionList table{width:100%;border-collapse:collapse;margin-top:10px}
-  #sessionList th,#sessionList td{border-bottom:1px solid var(--sep);padding:8px 6px;text-align:left;font-size:14px}
-  #sessionList th{color:#cbd5da;font-weight:600}
-  #sessionList td.actions-cell button{margin-right:6px}
+  .sessions-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:10px}
+  .sessions-scroll table{width:100%;border-collapse:collapse}
+  table.sessions{min-width:820px}
+  .sessions-scroll th,.sessions-scroll td{border-bottom:1px solid var(--sep);padding:8px 6px;text-align:left;font-size:14px}
+  .sessions-scroll th{color:#cbd5da;font-weight:600}
+  .sessions-scroll td.actions-cell button{margin-right:6px}
 </style>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -168,18 +191,34 @@
 
   <!-- Block: Resultate -->
   <section class="block" id="results">
-    <h2>Resultate</h2>
-    <canvas id="chart"></canvas>
-    <div id="summary" class="note"></div>
-    <div class="actions">
-      <button id="saveSession" disabled>Session speichern</button>
-      <button id="exportJSON">Export JSON</button>
-      <button id="exportCSV">Export CSV</button>
-    </div>
-    <div id="storageNote" class="note"></div>
-    <div id="sessionList"></div>
-    <div style="text-align:center;margin-top:10px">
-      <button id="clearSessions">Alle Sessions löschen</button>
+    <div class="result-wrap">
+      <h2>Resultate</h2>
+      <div class="result-head">
+        <div class="result-key">
+          <span id="resultAccuracy" class="result-accuracy">--.-%</span>
+          <div class="result-pwrap">
+            <span class="result-pvalue">p = <span id="resultPValue">--</span></span>
+            <span id="resultBadge" class="badge tier-random">Zufallsbereich</span>
+          </div>
+        </div>
+        <p class="result-info">Trefferquote: Anteil korrekter Schritte. p schätzt die Zufalls-Wahrscheinlichkeit; je kleiner, desto auffälliger.</p>
+        <p class="result-note">p &lt; 0.05 → eher nicht nur Zufall. p ≥ 0.05 → Zufallsbereich.</p>
+      </div>
+      <details id="chartDetails" open>
+        <summary>Details (Diagramm)</summary>
+        <canvas id="chart"></canvas>
+      </details>
+      <div id="summary" class="note"></div>
+      <div class="actions">
+        <button id="saveSession" disabled>Session speichern</button>
+        <button id="exportJSON">Export JSON</button>
+        <button id="exportCSV">Export CSV</button>
+      </div>
+      <div id="storageNote" class="note"></div>
+      <div id="sessionList"></div>
+      <div style="text-align:center;margin-top:10px">
+        <button id="clearSessions">Alle Sessions löschen</button>
+      </div>
     </div>
   </section>
 
@@ -214,6 +253,10 @@ const speedInp = document.getElementById('speed');
 const focusSel = document.getElementById('focus');
 const chart = document.getElementById('chart');
 const summary = document.getElementById('summary');
+const chartDetails = document.getElementById('chartDetails');
+const accuracyEl = document.getElementById('resultAccuracy');
+const pValueEl = document.getElementById('resultPValue');
+const pBadgeEl = document.getElementById('resultBadge');
 const toggleBtn = document.getElementById('toggle');
 const resetBtn = document.getElementById('reset');
 const saveBtn = document.getElementById('saveSession');
@@ -261,7 +304,7 @@ function loadSessions(){ try{ const s=localStorage.getItem(SKEY); sessions=s?JSO
 function persistSessions(){ try{ localStorage.setItem(SKEY, JSON.stringify(sessions)); storageNoteEl.textContent=''; return true }catch(e){ storageNoteEl.textContent='Speicher voll/blockiert. Export empfohlen.'; return false } }
 function makeDownload(filename, mime, dataStr){ const blob=new Blob([dataStr], {type:mime}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url); a.remove()},0) }
 function toCSV(rows){ const esc=v=>'"'+String(v).replace(/"/g,'""')+'"'; const header=['time','duration_min','speed_ms','start_field','focus','steps','cw','ccw','hits','misses','z','p']; const lines=[header.join(',')].concat(rows.map(r=>[esc(r.time), r.duration, r.speed, r.startField, esc(r.focus), r.steps, r.cw, r.ccw, r.hits, r.misses, r.z, r.p].join(','))); return lines.join('\n') }
-function updateSessionList(){ if(!sessions.length){ sessionListEl.innerHTML='<p class="note">Noch keine Sessions gespeichert.</p>'; return } let html='<table><thead><tr><th>Zeit</th><th>Dauer</th><th>Speed</th><th>Ziel</th><th>Schritte</th><th>Uhrz.</th><th>Gegen</th><th>Quote%</th><th>Aktionen</th></tr></thead><tbody>'; for(let i=sessions.length-1;i>=0;i--){ const s=sessions[i]; const q=s.steps?((s.hits/s.steps)*100).toFixed(1):'0.0'; html+='<tr data-i="'+i+'"><td>'+s.time+'</td><td>'+s.duration+'m</td><td>'+s.speed+'</td><td>'+s.focus+'</td><td>'+s.steps+'</td><td>'+s.cw+'</td><td>'+s.ccw+'</td><td>'+q+'</td><td><button data-action="dljson">JSON</button><button data-action="dlcsv">CSV</button><button data-action="del">Löschen</button></td></tr>' } html+='</tbody></table>'; sessionListEl.innerHTML=html }
+function updateSessionList(){ if(!sessions.length){ sessionListEl.innerHTML='<p class="note">Noch keine Sessions gespeichert.</p>'; return } let html='<div class="sessions-scroll"><table class="sessions"><thead><tr><th>Zeit</th><th>Dauer</th><th>Speed</th><th>Ziel</th><th>Schritte</th><th>Uhrz.</th><th>Gegen</th><th>Quote%</th><th>Aktionen</th></tr></thead><tbody>'; for(let i=sessions.length-1;i>=0;i--){ const s=sessions[i]; const q=s.steps?((s.hits/s.steps)*100).toFixed(1):'0.0'; html+='<tr data-i="'+i+'"><td>'+s.time+'</td><td>'+s.duration+'m</td><td>'+s.speed+'</td><td>'+s.focus+'</td><td>'+s.steps+'</td><td>'+s.cw+'</td><td>'+s.ccw+'</td><td>'+q+'</td><td class="actions-cell"><button data-action="dljson">JSON</button><button data-action="dlcsv">CSV</button><button data-action="del">Löschen</button></td></tr>' } html+='</tbody></table></div>'; sessionListEl.innerHTML=html }
 function exportAllJSON(){ makeDownload('sessions.json','application/json', JSON.stringify(sessions, null, 2)) }
 function exportAllCSV(){ makeDownload('sessions.csv','text/csv', toCSV(sessions)) }
 sessionListEl.addEventListener('click', (e)=>{ const btn=e.target.closest('button'); if(!btn) return; const tr=e.target.closest('tr'); if(!tr) return; const i=Number(tr.dataset.i); const s=sessions[i]; if(!s) return; const act=btn.dataset.action; if(act==='del'){ sessions.splice(i,1); persistSessions(); updateSessionList() } else if(act==='dljson'){ makeDownload('session_'+i+'.json','application/json', JSON.stringify(s, null, 2)) } else if(act==='dlcsv'){ makeDownload('session_'+i+'.csv','text/csv', toCSV([s])) } })
@@ -338,7 +381,7 @@ function stopExp(autoTriggered=false){
   const uploadPayload=makeUploadPayload(endedAt);
   if(uploadPayload) submitExperimentData(uploadPayload);
 }
-function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; chartHoverHighlight=null; chartHoverData=null; chartTooltip.classList.remove('visible'); chartTooltip.setAttribute('aria-hidden','true'); pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
+function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; chartHoverHighlight=null; chartHoverData=null; chartTooltip.classList.remove('visible'); chartTooltip.setAttribute('aria-hidden','true'); pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); if(accuracyEl) accuracyEl.textContent='--.-%'; if(pValueEl) pValueEl.textContent='--'; if(pBadgeEl){ pBadgeEl.className='badge tier-random'; pBadgeEl.textContent='Zufallsbereich'; } summary.innerHTML=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
 function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const hasOverride=btcOverride===true; ring.classList.toggle('btc', is21 || hasOverride) }
@@ -346,6 +389,9 @@ function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const
 
 // Chart & Stats
 function drawChart(){
+  if(chartDetails && !chartDetails.open){
+    return;
+  }
   const ctx=chart.getContext('2d');
   const cssW=chart.clientWidth||400;
   const cssH=chart.clientHeight||220;
@@ -513,6 +559,32 @@ function drawChart(){
   }
 }
 
+if(chartDetails){
+  const mq=window.matchMedia('(max-width: 767px)');
+  const applyDetailsState=(isMobile)=>{
+    if(isMobile){
+      if(chartDetails.open){
+        chartDetails.open=false;
+      }
+    }else if(!chartDetails.open){
+      chartDetails.open=true;
+      requestAnimationFrame(drawChart);
+    }
+  };
+  applyDetailsState(mq.matches);
+  const mqHandler=(event)=>applyDetailsState(event.matches);
+  if(typeof mq.addEventListener==='function'){
+    mq.addEventListener('change', mqHandler);
+  }else if(typeof mq.addListener==='function'){
+    mq.addListener(mqHandler);
+  }
+  chartDetails.addEventListener('toggle', ()=>{
+    if(chartDetails.open){
+      requestAnimationFrame(drawChart);
+    }
+  });
+}
+
 function setChartHighlight(idx){
   const current=chartHoverHighlight ? chartHoverHighlight.idx : null;
   if(current===idx) return;
@@ -582,6 +654,7 @@ function showSummary(){
   const acc= total? ((hits/total)*100).toFixed(1) : '0.0';
 
   const pDisplay = p<0.001 ? '< 0.001' : p.toFixed(3);
+  const pDisplayHtml = p<0.001 ? '&lt; 0.001' : p.toFixed(3);
   const tier = (p>=0.10)
     ? {label:'im Zufallsbereich', cls:'tier-random'}
     : (p>=0.05)
@@ -592,14 +665,18 @@ function showSummary(){
           ? {label:'sehr auffällig', cls:'tier-strong'}
           : {label:'extrem auffällig', cls:'tier-extreme'};
 
+  if(accuracyEl) accuracyEl.textContent=acc+'%';
+  if(pValueEl) pValueEl.textContent=pDisplay;
+  if(pBadgeEl){ pBadgeEl.className='badge '+tier.cls; pBadgeEl.textContent=tier.label; }
+
   const lines=[
-    'Ziel: <b>'+targetTxt+'</b> - Schritte: <b>'+total+'</b> - Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b>',
-    'Treffer: <b>'+hits+'</b> - Fehlversuche: <b>'+misses+'</b>',
+    'Ziel: <b>'+targetTxt+'</b>',
+    'Schritte: <b>'+total+'</b> (Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b>)',
+    'Treffer: <b>'+hits+'</b>, Fehlversuche: <b>'+misses+'</b>',
     'Trefferquote: <b>'+acc+'%</b>',
-    'Zufalls-Wahrscheinlichkeit (p): <b>'+pDisplay+'</b> <span class="badge '+tier.cls+'">'+tier.label+'</span>',
-    '<span class="summary-note">p &lt; 0.05 → eher nicht nur Zufall. p ≥ 0.05 → Zufallsbereich.</span>'
+    'p-Wert: <b>'+pDisplayHtml+'</b>'
   ];
-  summary.innerHTML=lines.join('<br>');
+  summary.innerHTML='<div class="summary-lines">'+lines.map(line=>'<div>'+line+'</div>').join('')+'</div>';
 
   lastStats={z, p, acc:Number(acc)};
   saveBtn.disabled=false;
