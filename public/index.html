@@ -73,11 +73,18 @@
   .marker.miss{background:var(--bad);box-shadow:0 0 24px var(--bad-soft)}
 
   .badge{display:inline-block;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:600;margin-left:10px;color:#0b0f10}
-  .badge.tier-random{background:rgba(180,190,200,.6);color:#0b0f10}
-  .badge.tier-mild{background:rgba(247,200,88,.7);color:#0b0f10}
-  .badge.tier-noticeable{background:rgba(255,159,67,.75);color:#0b0f10}
-  .badge.tier-strong{background:rgba(255,110,57,.8);color:#0b0f10}
-  .badge.tier-extreme{background:rgba(210,35,35,.85);color:#fff}
+  .badge.tier-random{background:rgba(188,198,208,.45);color:#0b0f10}
+  .badge.tier-mild{background:rgba(224,210,150,.45);color:#0b0f10}
+  .badge.tier-noticeable{background:rgba(255,196,140,.5);color:#0b0f10}
+  .badge.tier-strong{background:rgba(255,168,110,.55);color:#0b0f10}
+  .badge.tier-extreme{background:rgba(255,122,26,.65);color:#0b0f10}
+
+  .result-accuracy.mastermystic{color:var(--infinity)}
+
+  .chart-options{display:flex;justify-content:flex-end;align-items:center;margin-bottom:8px;gap:10px}
+  .example-toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .example-toggle input{width:18px;height:18px}
+  @media(max-width:767px){.chart-options{justify-content:center}}
 
   .summary-note{display:block;font-size:13px;color:var(--muted);margin-top:6px}
   .result-wrap{max-width:980px;margin:0 auto;padding:0 16px}
@@ -198,16 +205,24 @@
           <span id="resultAccuracy" class="result-accuracy">--.-%</span>
           <div class="result-pwrap">
             <span class="result-pvalue">p = <span id="resultPValue">--</span></span>
-            <span id="resultBadge" class="badge tier-random">Zufallsbereich</span>
+            <span id="resultBadge" class="badge tier-random">im Zufallsbereich</span>
           </div>
         </div>
         <p class="result-info">Trefferquote: Anteil korrekter Schritte. p schätzt die Zufalls-Wahrscheinlichkeit; je kleiner, desto auffälliger.</p>
-        <p class="result-note">p &lt; 0.05 → eher nicht nur Zufall. p ≥ 0.05 → Zufallsbereich.</p>
+        <p class="result-note">p ≥ 0.10 → im Zufallsbereich. 0.05 ≤ p &lt; 0.10 → leichte Tendenz. Je kleiner p, desto deutlicher die energetische Einflussnahme.</p>
       </div>
       <details id="chartDetails" open>
         <summary>Details (Diagramm)</summary>
+        <div class="chart-options">
+          <label class="example-toggle">
+            <input type="checkbox" id="exampleToggle" />
+            Beispiele anzeigen
+          </label>
+        </div>
         <canvas id="chart"></canvas>
       </details>
+      <p id="exampleGuidance" class="summary-note">Beispielkurven nutzen dieselben Eckdaten (Dauer/Schritte/Speed), variieren nur die Trefferquote und die Bewertung.</p>
+      <p id="exampleActiveNote" class="summary-note" hidden aria-live="polite">Beispiele dienen der Orientierung und sind nicht Teil deiner Session.</p>
       <div id="summary" class="note"></div>
       <div class="actions">
         <button id="saveSession" disabled>Session speichern</button>
@@ -254,6 +269,8 @@ const focusSel = document.getElementById('focus');
 const chart = document.getElementById('chart');
 const summary = document.getElementById('summary');
 const chartDetails = document.getElementById('chartDetails');
+const exampleToggle = document.getElementById('exampleToggle');
+const exampleActiveNote = document.getElementById('exampleActiveNote');
 const accuracyEl = document.getElementById('resultAccuracy');
 const pValueEl = document.getElementById('resultPValue');
 const pBadgeEl = document.getElementById('resultBadge');
@@ -266,6 +283,10 @@ const storageNoteEl = document.getElementById('storageNote');
 const sessionListEl = document.getElementById('sessionList');
 const clearSessionsBtn = document.getElementById('clearSessions');
 
+const rootStyles=getComputedStyle(document.documentElement);
+const okStrokeColor=(rootStyles.getPropertyValue('--ok')||'#6dff65').trim()||'#6dff65';
+const projectOrange=(rootStyles.getPropertyValue('--infinity')||'#ff7a1a').trim()||'#ff7a1a';
+
 const chartTooltip=document.createElement('div');
 chartTooltip.className='chart-tooltip';
 chartTooltip.setAttribute('aria-hidden','true');
@@ -275,6 +296,7 @@ let btcClicks=0, btcOverride=false;
 let autoSavePromptShown=false;
 let chartHoverData=null;
 let chartHoverHighlight=null;
+let showExampleCurves=false;
 
 function loadBtcOverride(){
   btcOverride=false;
@@ -295,6 +317,42 @@ function handleRingPointer(e){
       applyThemeFromDuration();
     }
   }
+}
+
+function syncToggleButton(){
+  if(!toggleBtn) return;
+  toggleBtn.textContent = running ? 'Experiment stoppen' : 'Experiment starten';
+}
+
+function roundedRectPath(ctx,x,y,width,height,radius){
+  const r=Math.max(0, Math.min(radius, width/2, height/2));
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+width-r, y);
+  ctx.quadraticCurveTo(x+width, y, x+width, y+r);
+  ctx.lineTo(x+width, y+height-r);
+  ctx.quadraticCurveTo(x+width, y+height, x+width-r, y+height);
+  ctx.lineTo(x+r, y+height);
+  ctx.quadraticCurveTo(x, y+height, x, y+height-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function updateExampleNote(){
+  if(!exampleActiveNote) return;
+  if(showExampleCurves){
+    exampleActiveNote.hidden=false;
+    exampleActiveNote.setAttribute('aria-hidden','false');
+  }else{
+    exampleActiveNote.hidden=true;
+    exampleActiveNote.setAttribute('aria-hidden','true');
+  }
+}
+
+function refreshExamplesAfterConfig(){
+  if(!showExampleCurves || running) return;
+  requestAnimationFrame(drawChart);
 }
 
 // Storage
@@ -349,7 +407,7 @@ function startExp(){
   if(running) return;
   resetExp();
   running=true;
-  toggleBtn.textContent='Experiment stoppen';
+  syncToggleButton();
   saveBtn.disabled=true;
   const mins=Number(durSel.value)||1;
   startedAt=Date.now();
@@ -363,7 +421,7 @@ function startExp(){
 function stopExp(autoTriggered=false){
   if(!running) return;
   running=false;
-  toggleBtn.textContent='Experiment starten';
+  syncToggleButton();
   if(timer){ cancelAnimationFrame(timer); timer=null; }
   drawChart();
   showSummary();
@@ -381,13 +439,45 @@ function stopExp(autoTriggered=false){
   const uploadPayload=makeUploadPayload(endedAt);
   if(uploadPayload) submitExperimentData(uploadPayload);
 }
-function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; chartHoverHighlight=null; chartHoverData=null; chartTooltip.classList.remove('visible'); chartTooltip.setAttribute('aria-hidden','true'); pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); if(accuracyEl) accuracyEl.textContent='--.-%'; if(pValueEl) pValueEl.textContent='--'; if(pBadgeEl){ pBadgeEl.className='badge tier-random'; pBadgeEl.textContent='Zufallsbereich'; } summary.innerHTML=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
+function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; syncToggleButton(); steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; chartHoverHighlight=null; chartHoverData=null; chartTooltip.classList.remove('visible'); chartTooltip.setAttribute('aria-hidden','true'); pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); if(accuracyEl){ accuracyEl.textContent='--.-%'; accuracyEl.classList.remove('mastermystic'); } if(pValueEl) pValueEl.textContent='--'; if(pBadgeEl){ pBadgeEl.className='badge tier-random'; pBadgeEl.textContent='im Zufallsbereich'; } summary.innerHTML=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height); if(showExampleCurves){ requestAnimationFrame(drawChart); } }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
 function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const hasOverride=btcOverride===true; ring.classList.toggle('btc', is21 || hasOverride) }
 // /EDIT: THEME‑LOGIK
 
 // Chart & Stats
+function estimatePlannedSteps(){
+  const mins=Number(durSel.value);
+  if(!Number.isFinite(mins) || mins<=0) return 0;
+  const speedValue=Number(speedInp.value);
+  const fallbackInterval=Number.isFinite(interval)?interval:800;
+  const speedMs=(Number.isFinite(speedValue) && speedValue>0)?Math.max(10, speedValue):Math.max(10, fallbackInterval);
+  const totalMs=mins*60*1000;
+  if(!Number.isFinite(totalMs) || totalMs<=0) return 0;
+  return Math.max(1, Math.round(totalMs/speedMs));
+}
+
+function buildExampleCurves(totalSteps){
+  const steps=Math.max(1, totalSteps||0);
+  if(!showExampleCurves || !steps) return [];
+  const direction=(focusDir===-1)?-1:1;
+  const defs=[
+    {rate:0.65,label:'Beispielkurve – stark (≈ 65 % Treffer)', color:okStrokeColor, alpha:0.55, width:3},
+    {rate:0.75,label:'Beispielkurve – extrem (≈ 75 % Treffer)', color:projectOrange, alpha:0.7, width:3.5}
+  ];
+  return defs.map(def=>{
+    const slope=(2*def.rate-1)*direction;
+    const values=[];
+    for(let i=0;i<=steps;i++){
+      const progress=steps?i/steps:0;
+      const base=slope*i;
+      const modulation=Math.sin(progress*Math.PI)*slope*0.35;
+      values.push(base+modulation);
+    }
+    return {...def, values};
+  });
+}
+
 function drawChart(){
   if(chartDetails && !chartDetails.open){
     return;
@@ -404,8 +494,6 @@ function drawChart(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.lineJoin='round';
   ctx.lineCap='round';
-  ctx.font='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
-  ctx.fillStyle='rgba(235,239,242,.8)';
 
   const stepsCount=hist.length;
   const cumulative=[0];
@@ -415,19 +503,46 @@ function drawChart(){
     cumulative.push(runningTotal);
   }
 
-  const outerBand=Math.max(1.96*Math.sqrt(stepsCount||1),1);
-  let maxAbs=outerBand;
-  for(let i=0;i<cumulative.length;i++){
-    const val=Math.abs(cumulative[i]);
-    if(val>maxAbs) maxAbs=val;
+  const estimatedSteps=estimatePlannedSteps();
+  const chartSteps=stepsCount || (showExampleCurves ? Math.max(estimatedSteps,1) : 0);
+  const scaleXFactor=W/(chart.getBoundingClientRect().width||cssW);
+  const scaleYFactor=H/(chart.getBoundingClientRect().height||cssH);
+
+  if(!chartSteps){
+    chartHoverData={
+      points:[],
+      scaleX:scaleXFactor,
+      scaleY:scaleYFactor,
+      indexToX:()=>pad,
+      valueToY:()=>pad + h/2
+    };
+    return;
   }
-  const scale=Math.max(maxAbs,1);
+
+  const axisFontSize=cssW<540?24:28;
+  ctx.font=`${axisFontSize}px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial`;
+  ctx.fillStyle='rgba(235,239,242,.82)';
+
+  const indexToX=(idx)=> pad + (chartSteps ? (idx/chartSteps)*w : 0);
   const midY=pad + h/2;
 
-  const indexToX = (idx)=> pad + (stepsCount ? (idx/stepsCount)*w : 0);
-  const valueToY = (val)=> midY - (val/scale)*(h/2*0.95);
+  const exampleCurves=showExampleCurves ? buildExampleCurves(chartSteps) : [];
+  const outerBand=Math.max(1.96*Math.sqrt(chartSteps||1),1);
+  let maxAbs=outerBand;
+  for(const val of cumulative){
+    const abs=Math.abs(val);
+    if(abs>maxAbs) maxAbs=abs;
+  }
+  for(const curve of exampleCurves){
+    for(const val of curve.values){
+      const abs=Math.abs(val);
+      if(abs>maxAbs) maxAbs=abs;
+    }
+  }
+  const scale=Math.max(maxAbs,1);
+  const valueToY=(val)=> midY - (val/scale)*(h/2*0.95);
 
-  ctx.strokeStyle='rgba(200,205,210,0.45)';
+  ctx.strokeStyle='rgba(200,205,210,0.42)';
   ctx.lineWidth=2;
   ctx.beginPath();
   ctx.moveTo(pad, pad-12);
@@ -438,7 +553,7 @@ function drawChart(){
   ctx.lineTo(pad+w+12, pad+h);
   ctx.stroke();
 
-  ctx.fillStyle='rgba(235,239,242,.85)';
+  ctx.fillStyle='rgba(235,239,242,.78)';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
   ctx.fillText('Schritte', pad + w/2, pad+h + 40);
@@ -448,41 +563,54 @@ function drawChart(){
   ctx.fillText('Kumulierte Tendenz', 0, 0);
   ctx.restore();
 
-  ctx.strokeStyle='rgba(160,170,180,0.55)';
+  ctx.strokeStyle='rgba(160,170,180,0.5)';
   ctx.lineWidth=2;
   ctx.beginPath();
   ctx.moveTo(pad, midY);
   ctx.lineTo(pad+w, midY);
   ctx.stroke();
 
-  ctx.globalAlpha=1;
   const drawBand=(multiplier, fillStyle)=>{
-    if(!stepsCount) return;
     ctx.beginPath();
     ctx.moveTo(indexToX(0), valueToY(multiplier*Math.sqrt(0)));
-    for(let i=1;i<=stepsCount;i++){
+    for(let i=1;i<=chartSteps;i++){
       ctx.lineTo(indexToX(i), valueToY(multiplier*Math.sqrt(i)));
     }
-    for(let i=stepsCount;i>=0;i--){
+    for(let i=chartSteps;i>=0;i--){
       ctx.lineTo(indexToX(i), valueToY(-multiplier*Math.sqrt(i)));
     }
     ctx.closePath();
     ctx.fillStyle=fillStyle;
     ctx.fill();
   };
-  drawBand(1.96,'rgba(124,180,255,0.1)');
-  drawBand(1,'rgba(124,255,107,0.10)');
+  drawBand(1.96,'rgba(124,180,255,0.12)');
+  drawBand(1,'rgba(124,255,107,0.08)');
 
-  ctx.strokeStyle='rgba(124,255,107,0.9)';
-  ctx.lineWidth=3;
-  ctx.beginPath();
-  ctx.moveTo(indexToX(0), valueToY(0));
-  for(let i=1;i<=stepsCount;i++){
-    ctx.lineTo(indexToX(i), valueToY(cumulative[i]));
-  }
-  ctx.stroke();
+  exampleCurves.forEach(curve=>{
+    const values=curve.values;
+    ctx.save();
+    ctx.globalAlpha=curve.alpha;
+    ctx.strokeStyle=curve.color;
+    ctx.lineWidth=curve.width;
+    ctx.beginPath();
+    ctx.moveTo(indexToX(0), valueToY(values[0]||0));
+    for(let i=1;i<values.length;i++){
+      ctx.lineTo(indexToX(i), valueToY(values[i]));
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
 
   if(stepsCount){
+    ctx.strokeStyle='rgba(124,255,107,0.9)';
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(indexToX(0), valueToY(0));
+    for(let i=1;i<=stepsCount;i++){
+      ctx.lineTo(indexToX(i), valueToY(cumulative[i]));
+    }
+    ctx.stroke();
+
     ctx.fillStyle='rgba(124,255,107,0.95)';
     const lastX=indexToX(stepsCount);
     const lastY=valueToY(cumulative[cumulative.length-1]);
@@ -491,60 +619,76 @@ function drawChart(){
     ctx.fill();
   }
 
-  const legendWidth=Math.min(360, Math.max(220, w*0.5));
-  const legendHeight=120;
-  const legendX=pad + w - legendWidth - 12;
-  const legendY=pad + 12;
-  ctx.fillStyle='rgba(10,14,18,0.75)';
-  ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
+  const legendItems=[
+    {label:'Kumulierte Tendenz', type:'line', color:'rgba(124,255,107,0.9)', width:4, alpha:1},
+    {label:'Null-Linie', type:'line', color:'rgba(160,170,180,0.55)', width:3, alpha:1},
+    {label:'Zufallsband (95 %)', type:'fill', color:'rgba(124,180,255,0.28)'}
+  ];
+  exampleCurves.forEach(curve=>{
+    legendItems.push({label:curve.label, type:'line', color:curve.color, width:curve.width, alpha:curve.alpha});
+  });
+
+  const legendScale=cssW<540?0.85:1;
+  const legendPadding=18*legendScale;
+  const legendRowHeight=30*legendScale;
+  const legendWidth=Math.min(360, Math.max(220, w*0.45))*legendScale;
+  const legendHeight=legendPadding*2 + legendItems.length*legendRowHeight;
+  const legendX=pad + 14;
+  const legendY=pad + 14;
+  ctx.save();
+  roundedRectPath(ctx, legendX, legendY, legendWidth, legendHeight, 14*legendScale);
+  ctx.fillStyle='rgba(12,18,24,0.58)';
+  ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.08)';
-  ctx.strokeRect(legendX, legendY, legendWidth, legendHeight);
-  ctx.fillStyle='rgba(235,239,242,.9)';
+  ctx.stroke();
+  ctx.restore();
+
+  const legendFontSize=Math.max(14, Math.round(20*legendScale));
+  ctx.font=`${legendFontSize}px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial`;
   ctx.textAlign='left';
   ctx.textBaseline='middle';
-  ctx.font='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
-
-  const legendItems=[
-    {label:'Kumulierte Tendenz', type:'line', color:'rgba(124,255,107,0.9)'},
-    {label:'Null-Linie', type:'line', color:'rgba(160,170,180,0.55)'},
-    {label:'Zufallsbereich', type:'fill', color:'rgba(124,180,255,0.35)'}
-  ];
-  const legendLineX=legendX+24;
-  let legendRowY=legendY+28;
+  const legendLineX=legendX + legendPadding;
+  let legendRowY=legendY + legendPadding + legendRowHeight/2;
   legendItems.forEach(item=>{
     if(item.type==='line'){
+      ctx.save();
+      ctx.globalAlpha=item.alpha ?? 1;
       ctx.strokeStyle=item.color;
-      ctx.lineWidth=4;
+      ctx.lineWidth=item.width||3;
       ctx.beginPath();
       ctx.moveTo(legendLineX, legendRowY);
-      ctx.lineTo(legendLineX+54, legendRowY);
+      ctx.lineTo(legendLineX + 54*legendScale, legendRowY);
       ctx.stroke();
+      ctx.restore();
     }else if(item.type==='fill'){
+      ctx.save();
       ctx.fillStyle=item.color;
-      ctx.fillRect(legendLineX, legendRowY-10, 54, 20);
+      ctx.fillRect(legendLineX, legendRowY-10*legendScale, 54*legendScale, 20*legendScale);
+      ctx.restore();
     }
-    ctx.fillStyle='rgba(235,239,242,.9)';
-    ctx.fillText(item.label, legendLineX+72, legendRowY);
-    legendRowY+=34;
+    ctx.fillStyle='rgba(235,239,242,.88)';
+    ctx.fillText(item.label, legendLineX + 66*legendScale, legendRowY);
+    legendRowY += legendRowHeight;
   });
 
   chartHoverData={
     points:[],
-    scaleX:W/(chart.getBoundingClientRect().width||cssW),
-    scaleY:H/(chart.getBoundingClientRect().height||cssH),
+    scaleX:scaleXFactor,
+    scaleY:scaleYFactor,
     indexToX,
     valueToY
   };
-  for(let i=1;i<=stepsCount;i++){
-    chartHoverData.points.push({
-      x:indexToX(i),
-      y:valueToY(cumulative[i]),
-      idx:i,
-      value:cumulative[i],
-      dir:hist[i-1]===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'
-    });
-  }
-  if(!stepsCount){
+  if(stepsCount){
+    for(let i=1;i<=stepsCount;i++){
+      chartHoverData.points.push({
+        x:indexToX(i),
+        y:valueToY(cumulative[i]),
+        idx:i,
+        value:cumulative[i],
+        dir:hist[i-1]===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'
+      });
+    }
+  }else{
     chartHoverData.points=[];
   }
   if(chartHoverHighlight){
@@ -658,14 +802,17 @@ function showSummary(){
   const tier = (p>=0.10)
     ? {label:'im Zufallsbereich', cls:'tier-random'}
     : (p>=0.05)
-      ? {label:'leicht überdurchschnittlich', cls:'tier-mild'}
+      ? {label:'leichte Tendenz zu Einflussnahme', cls:'tier-mild'}
       : (p>=0.01)
-        ? {label:'auffällig', cls:'tier-noticeable'}
+        ? {label:'auffällige energetische Einflussnahme', cls:'tier-noticeable'}
         : (p>=0.001)
-          ? {label:'sehr auffällig', cls:'tier-strong'}
-          : {label:'extrem auffällig', cls:'tier-extreme'};
+          ? {label:'sehr starke energetische Einflussnahme', cls:'tier-strong'}
+          : {label:'extrem starke energetische Einflussnahme', cls:'tier-extreme'};
 
-  if(accuracyEl) accuracyEl.textContent=acc+'%';
+  if(accuracyEl){
+    accuracyEl.textContent=acc+'%';
+    accuracyEl.classList.toggle('mastermystic', tier.cls==='tier-extreme');
+  }
   if(pValueEl) pValueEl.textContent=pDisplay;
   if(pBadgeEl){ pBadgeEl.className='badge '+tier.cls; pBadgeEl.textContent=tier.label; }
 
@@ -721,14 +868,27 @@ function makeUploadPayload(endTs){
 // Events
 toggleBtn.onclick = ()=> running ? stopExp(false) : startExp();
 resetBtn.onclick = resetExp;
-durSel.onchange = applyThemeFromDuration;
+durSel.onchange = ()=>{ applyThemeFromDuration(); refreshExamplesAfterConfig(); };
 startSel.onchange = ()=>{
   if(running) return;
   const selected=Number(startSel.value);
   pos=Number.isFinite(selected)?selected:0;
   placeMarker(pos);
 };
-focusSel.onchange = (e)=>{ focusDir=(e.target.value==='cw')?1:-1 };
+focusSel.onchange = (e)=>{ focusDir=(e.target.value==='cw')?1:-1; refreshExamplesAfterConfig(); };
+if(speedInp){
+  const handleSpeedChange=()=>{ refreshExamplesAfterConfig(); };
+  speedInp.addEventListener('change', handleSpeedChange);
+  speedInp.addEventListener('input', handleSpeedChange);
+}
+if(exampleToggle){
+  exampleToggle.addEventListener('change', ()=>{
+    showExampleCurves=!!exampleToggle.checked;
+    updateExampleNote();
+    hideChartTooltip();
+    requestAnimationFrame(drawChart);
+  });
+}
 saveBtn.onclick = ()=>{ const rec=currentSessionRecord(); sessions.push(rec); if(!persistSessions()){ makeDownload('session-lokal.json','application/json', JSON.stringify(rec, null, 2)) } updateSessionList(); if(sessions.length>=200){ storageNoteEl.textContent='Viele Sessions gespeichert - bitte regelmäßig exportieren.' } };
 exportJSONBtn.onclick = exportAllJSON;
 exportCSVBtn.onclick = exportAllCSV;
@@ -747,6 +907,7 @@ loadBtcOverride();
 loadSessions();
 updateSessionList();
 init();
+updateExampleNote();
 runTests();
 </script>
 <script>
