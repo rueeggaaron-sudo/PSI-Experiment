@@ -129,7 +129,7 @@
       Der Ring besteht aus 16 gleichverteilten Feldern; die Auswahl des Startfelds ändert nur die Ausgangsposition.
     </p>
     <div class="controls">
-      <label>Laufzeit
+      <label>Dauer (min)
         <!-- EDIT: PRESETS (Dauer in Minuten) -->
         <select id="duration"><option>1</option><option>2</option><option>3</option><option>5</option><option>8</option><option>13</option><option>21</option></select>
         <!-- /EDIT: PRESETS -->
@@ -177,6 +177,12 @@
   <!-- /EDIT: COPY (Nachwort) -->
 </main>
 
+<footer style="max-width:980px;margin:0 auto;padding:0 16px 24px;display:flex;justify-content:flex-end;gap:16px;align-items:center;color:var(--muted);font-size:14px;">
+  <span>Anonyme Sessions (UID, keine PII).</span>
+  <a href="/privacy.html" style="color:inherit;text-decoration:underline;">Datenschutz</a>
+  <a href="/imprint.html" style="color:inherit;text-decoration:underline;">Impressum</a>
+</footer>
+
 <script>
 // EDIT: CONFIG (Konstanten anpassen)
 const N = 16;           // Anzahl Felder (fix)
@@ -203,36 +209,14 @@ const storageNoteEl = document.getElementById('storageNote');
 const sessionListEl = document.getElementById('sessionList');
 const clearSessionsBtn = document.getElementById('clearSessions');
 
-const BTC_OVERRIDE_KEY='pke7g_btc_override';
-let btcOverride=false;
-let ringTapCount=0;
-
-function persistBtcOverride(enabled){
-  let stored=false;
-  try{ localStorage.setItem(BTC_OVERRIDE_KEY, enabled?'1':'0'); stored=true }catch(e){}
-  if(!stored){
-    try{ sessionStorage.setItem(BTC_OVERRIDE_KEY, enabled?'1':'0'); stored=true }catch(e){}
-  }
-  return stored;
-}
+let btcClicks=0, btcOverride=false;
 
 function loadBtcOverride(){
-  try{ const v=localStorage.getItem(BTC_OVERRIDE_KEY); if(v!==null){ btcOverride=v==='1'; ringTapCount=btcOverride?21:0; return } }catch(e){}
-  try{ const v=sessionStorage.getItem(BTC_OVERRIDE_KEY); if(v!==null){ btcOverride=v==='1'; ringTapCount=btcOverride?21:0; return } }catch(e){}
   btcOverride=false;
-  ringTapCount=0;
-}
-
-function activateBtcOverride(){
-  if(btcOverride) return;
-  btcOverride=true;
-  ringTapCount=21;
-  persistBtcOverride(true);
-  applyThemeFromDuration();
+  btcClicks=0;
 }
 
 function handleRingPointer(e){
-  if(btcOverride) return;
   if(e.pointerType==='mouse' && e.button!==0) return;
   const rect=ring.getBoundingClientRect();
   const x=e.clientX-rect.left;
@@ -241,9 +225,9 @@ function handleRingPointer(e){
   const dy=y-rect.height/2;
   const dist=Math.sqrt(dx*dx+dy*dy);
   if(dist<=rect.width/2){
-    ringTapCount=Math.min(ringTapCount+1,21);
-    if(ringTapCount===21){
-      activateBtcOverride();
+    if(!btcOverride && ++btcClicks>=21){
+      btcOverride=true;
+      applyThemeFromDuration();
     }
   }
 }
@@ -298,10 +282,10 @@ function stopExp(){
   const uploadPayload=makeUploadPayload(endedAt);
   if(uploadPayload) submitExperimentData(uploadPayload);
 }
-function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
+function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; btcClicks=0; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
-function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; ring.classList.toggle('btc', is21 || btcOverride) }
+function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const hasOverride=btcOverride===true; ring.classList.toggle('btc', is21 || hasOverride) }
 // /EDIT: THEME‑LOGIK
 
 // Chart & Stats
