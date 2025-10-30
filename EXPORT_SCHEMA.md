@@ -1,19 +1,30 @@
-# Experiment Ingest Schema
+# Export / Ingest Schema (Stand: 2025-10-30)
 
-| Feld | Typ | Beschreibung |
-|-------|------|--------------|
-| uid | string | anonyme Browser-ID (optional) |
-| ts | number | Zeitstempel (ms seit Epoch) |
-| duration_min | number | Dauer der Session (Minuten) |
-| speed_ms | number | Geschwindigkeit (ms) |
-| start_field | number | Startfeld |
-| focus | string | 'cw' oder 'ccw' |
-| steps | number | Schritte gesamt |
-| cw | number | Schritte Uhrzeigersinn |
-| ccw | number | Schritte Gegenuhrzeigersinn |
-| hits | number | Treffer |
-| misses | number | Fehlversuche |
-| z | number | Z-Wert |
-| p | number | P-Wert |
+## Pfad
+`exp/YYYY-MM-DD/<uid>-<timestamp>-<rand>.json` (private Objekte im Blob)
 
-**Speicherort:** `exp/YYYY-MM-DD/<uid|anon>-<timestamp>-<rand>.json`
+## Whitelist-Felder (JSON pro Session)
+| Feld          | Typ     | Beschreibung                                   |
+|---------------|---------|------------------------------------------------|
+| uid           | string  | Anonyme Browser-ID (localStorage)              |
+| ts            | number  | Zeitstempel (ms seit Epoch)                    |
+| duration_min  | number  | Dauer (Minuten)                                |
+| speed_ms      | number  | Schrittintervall (ms)                          |
+| start_field   | number  | Startfeld (1-basiert)                          |
+| focus         | string  | 'Uhrzeigersinn' oder 'Gegenuhrzeigersinn'      |
+| steps         | number  | Schritte gesamt                                |
+| cw            | number  | Schritte Uhrzeigersinn                         |
+| ccw           | number  | Schritte Gegenuhrzeigersinn                    |
+| hits          | number  | Treffer                                        |
+| misses        | number  | Fehlversuche                                   |
+| z             | number  | z-Score (Approximation)                        |
+| p             | number  | p-Wert (Approximation)                         |
+| hit_rate      | number  | Trefferquote (0–1)                             |
+
+## Export-Endpoint
+`/api/exp/export?day=YYYY-MM-DD&format=csv|jsonl`  
+- CSV: Headerlinie + Zeilen pro Session (Whitelist-Felder).  
+- JSONL: eine JSON-Zeile pro Session.
+
+## Datenschutz
+Anonym (UID), keine PII. Aufbewahrung projektspezifisch.

@@ -1,14 +1,24 @@
+# PSI-Experiment · Projekt
+
 ## Deployment Flow
+- `dev` → Pre-Production (Vercel Preview)  
+- `main` → Production  
+PRs: Feature → `dev`, Release via PR `dev → main` (Checks/Build grün).
 
-1) **Branches & Domains**
-   - `dev` → Pre-Production (Vercel: `psi-experiment-preproduction.vercel.app`)
-   - `main` → Production (Vercel: `psi-experiment.vercel.app`)
+## Daten & Privacy
+- Anonyme **UID** pro Browser (localStorage), **keine PII**, **keine Tracker**.  
+- Session-Speicherung als einzelne Dateien im **Vercel Blob**.  
+- Siehe `public/privacy.html` und `CONSENT.md`.
 
-2) **Pull Requests**
-   - Feature-Branch → **PR nach `dev`** (Preview & Test).
-   - Release → **PR `dev` → `main`** (geht live).
-   - `main` ist geschützt: PR + 1 Approval + erfolgreicher **Vercel**-Build sind Pflicht.
+## Ergebnisse (UI)
+- Trefferquote + **p-Badge** (Stufen von „Zufall“ bis „extrem stark“).  
+- Diagramm optional (Achsen, Null-Linie, Zufallsbänder, Tooltip).  
+- Session-Tabelle mit horizontalem Scroll für schmale Bildschirme.
 
-3) **Mergen**
-   - In PRs **Squash** bevorzugen (saubere History).
-   - Kein direkter Push auf `main`; `dev` bleibt frei für Tests.
+## Export
+- Endpoint: `/api/exp/export?day=YYYY-MM-DD&format=csv|jsonl`  
+- Siehe `EXPORT_SCHEMA.md` für Felder.
+
+## Entwickeln
+- Keine externen Libs für Chart/Tooltip (pures Canvas/DOM).  
+- API-Routen: Serverless (Node.js) statt Edge, damit `@vercel/blob` sicher läuft.
