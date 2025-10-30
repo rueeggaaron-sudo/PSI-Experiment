@@ -186,7 +186,7 @@ const TRAIL_LEN = 6;    // Laenge der Trail‑Spur (optisch)
 
 // State & Elemente
 let pos=0, steps=0, cw=0, ccw=0, hits=0, misses=0;
-let trail=[], hist=[], running=false, endAt=0, interval=800, timer=null, focusDir=1;
+let trail=[], hist=[], running=false, endAt=0, startedAt=0, interval=800, timer=null, focusDir=1;
 const ring = document.getElementById('ring');
 const startSel = document.getElementById('start');
 const durSel = document.getElementById('duration');
@@ -273,9 +273,32 @@ function placeMarker(i){ const m=document.getElementById('marker'); const r=RADI
 
 function step(){ const dir=Math.random()<0.5?-1:1; pos=(pos+dir+N)%N; steps++; if(dir===1) cw++; else ccw++; hist.push(dir); const marker=document.getElementById('marker'); const hit=(dir===focusDir); if(hit){ hits++; marker.className='marker hit' } else { misses++; marker.className='marker miss' } placeMarker(pos) }
 function loop(){ if(!running) return; const now=Date.now(); if(now>=endAt){ stopExp(); return } step(); timer=requestAnimationFrame(()=> setTimeout(loop, interval)) }
-function startExp(){ if(running) return; resetExp(); running=true; toggleBtn.textContent='Experiment stoppen'; saveBtn.disabled=true; const mins=Number(durSel.value)||1; endAt=Date.now()+mins*60*1000; interval=Number(speedInp.value)||800; focusDir=(focusSel.value==='cw')?1:-1; applyThemeFromDuration(); loop() }
-function stopExp(){ running=false; toggleBtn.textContent='Experiment starten'; drawChart(); showSummary() }
-function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; saveBtn.disabled=true; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
+function startExp(){
+  if(running) return;
+  resetExp();
+  running=true;
+  toggleBtn.textContent='Experiment stoppen';
+  saveBtn.disabled=true;
+  const mins=Number(durSel.value)||1;
+  startedAt=Date.now();
+  endAt=startedAt + mins*60*1000;
+  interval=Number(speedInp.value)||800;
+  if(interval<10) interval=10;
+  focusDir=(focusSel.value==='cw')?1:-1;
+  applyThemeFromDuration();
+  loop();
+}
+function stopExp(){
+  if(!running) return;
+  running=false;
+  toggleBtn.textContent='Experiment starten';
+  drawChart();
+  showSummary();
+  const endedAt=Date.now();
+  const uploadPayload=makeUploadPayload(endedAt);
+  if(uploadPayload) submitExperimentData(uploadPayload);
+}
+function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
 function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; ring.classList.toggle('btc', is21 || btcOverride) }
@@ -287,6 +310,41 @@ function erf(x){ const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.45315
 function pTwoTailFromZ(z){ const phi=0.5*(1+erf(Math.abs(z)/Math.SQRT2)); return 2*(1-phi) }
 function showSummary(){ const total=cw+ccw; const diff=cw-ccw; const z = total? (diff)/Math.sqrt(total) : 0; const p = pTwoTailFromZ(z); const targetTxt=(focusDir===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'); const acc= total? ((hits/total)*100).toFixed(1) : '0.0'; summary.innerHTML='Ziel: <b>'+targetTxt+'</b> - Schritte: <b>'+total+'</b> - Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b><br>'+'Treffer (gruen): <b>'+hits+'</b> - Fehl (rot): <b>'+misses+'</b> - Trefferquote: <b>'+acc+'%</b><br>'+'Z-Test (naehere Approximation): z='+z.toFixed(2)+', p~'+(p<0.001?'<'+'0.001':p.toFixed(3)); lastStats={z, p, acc:Number(acc)}; saveBtn.disabled=false }
 function currentSessionRecord(){ const duration=Number(durSel.value)||0; const speed=Number(speedInp.value)||0; const focus=(focusSel.value==='cw'?'Uhrzeigersinn':'Gegenuhrzeigersinn'); return { time:new Date().toISOString(), duration, speed, startField:Number(startSel.value)+1, focus, steps:cw+ccw, cw, ccw, hits, misses, z:lastStats?Number(lastStats.z||((cw-ccw)/Math.sqrt((cw+ccw)||1))):((cw-ccw)/Math.sqrt((cw+ccw)||1)), p:lastStats?Number(lastStats.p||0):0 } }
+
+function makeUploadPayload(endTs){
+  const totalSteps=cw+ccw;
+  if(!totalSteps) return null;
+  const safeEnd=(typeof endTs==='number' && Number.isFinite(endTs))?Math.round(endTs):Date.now();
+  const durationMs=startedAt?Math.max(0, safeEnd-startedAt):0;
+  const plannedDuration=Number(durSel.value)||0;
+  const durationMinutes=durationMs?durationMs/60000:plannedDuration;
+  const speedInput=Number(speedInp.value);
+  const speedMs=(Number.isFinite(speedInput) && speedInput>0)?speedInput:Math.max(0, interval);
+  const startIndex=Number(startSel.value);
+  const startField=Number.isFinite(startIndex)?Math.max(1, Math.round(startIndex)+1):1;
+  const focusValue=(focusSel.value==='ccw')?'ccw':'cw';
+  const diff=cw-ccw;
+  const denom=Math.sqrt(totalSteps||1);
+  const fallbackZ=denom?diff/denom:0;
+  const lastZ=lastStats && Number.isFinite(Number(lastStats.z))?Number(lastStats.z):fallbackZ;
+  const safeZ=Number.isFinite(lastZ)?lastZ:0;
+  const lastP=lastStats && Number.isFinite(Number(lastStats.p))?Number(lastStats.p):pTwoTailFromZ(safeZ);
+  const safeP=Number.isFinite(lastP)?Math.min(Math.max(lastP,0),1):Math.min(Math.max(pTwoTailFromZ(safeZ),0),1);
+  return {
+    ts:safeEnd,
+    duration_min:Number(Math.max(0, durationMinutes).toFixed(4)),
+    speed_ms:Number(speedMs),
+    start_field:startField,
+    focus:focusValue,
+    steps:totalSteps,
+    cw,
+    ccw,
+    hits,
+    misses,
+    z:safeZ,
+    p:safeP
+  };
+}
 
 // Events
 toggleBtn.onclick = ()=> running ? stopExp() : startExp();
@@ -308,18 +366,32 @@ updateSessionList();
 init();
 runTests();
 </script>
-</body>
-</html>
 <script>
 async function submitExperimentData(rec){
-  const consent = JSON.parse(localStorage.getItem('exp-upload-ok')||'false');
-  if(!consent) return; // kein Upload ohne Zustimmung
+  let consent=false;
+  try{
+    const raw=typeof localStorage!=='undefined'?localStorage.getItem('exp-upload-ok'):null;
+    consent=raw?JSON.parse(raw):false;
+  }catch(e){
+    try{
+      const raw=typeof sessionStorage!=='undefined'?sessionStorage.getItem('exp-upload-ok'):null;
+      consent=raw?JSON.parse(raw):false;
+    }catch(err){ consent=false; }
+  }
+  if(!consent) return;
+  const payload=(rec && typeof rec==='object')?{...rec}:{};
+  const tsValue=payload.ts;
+  payload.ts=(typeof tsValue==='number' && Number.isFinite(tsValue))?Math.round(tsValue):Date.now();
   try{
     await fetch('/api/exp/submit', {
       method:'POST',
       headers:{'content-type':'application/json'},
-      body: JSON.stringify(rec)
+      body: JSON.stringify(payload),
+      keepalive:true
     });
   }catch(e){ console.warn('Experiment upload failed', e); }
 }
 </script>
+<script src="/uid.js"></script>
+</body>
+</html>
