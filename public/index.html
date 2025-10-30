@@ -68,6 +68,7 @@
   /* Punkte: 20% grösser, näher am Zentrum (via JS‑Radius) */
   .dot{position:absolute;width:38px;height:38px;border-radius:50%;background:var(--dot);transform:translate(-50%,-50%);z-index:2;box-shadow:0 0 0 6px var(--ring-bg)}
   .marker{position:absolute;width:44px;height:44px;border-radius:50%;transform:translate(-50%,-50%);z-index:3;background:var(--ok);box-shadow:0 0 24px var(--ok-soft);transition:background .15s,box-shadow .15s}
+  .marker.prestart{background:#3399FF;box-shadow:0 0 24px rgba(51,153,255,.45)}
   .marker.hit{background:var(--ok);box-shadow:0 0 28px var(--ok-soft)}
   .marker.miss{background:var(--bad);box-shadow:0 0 24px var(--bad-soft)}
 
@@ -145,10 +146,12 @@
       <label>Zielrichtung
         <select id="focus"><option value="cw">Uhrzeigersinn</option><option value="ccw">Gegenuhrzeigersinn</option></select>
       </label>
+    </div>
+    <div class="ringWrap"><div id="ring" class="ring"></div></div>
+    <div class="actions" style="margin-top:24px">
       <button id="toggle">Experiment starten</button>
       <button id="reset">Reset</button>
     </div>
-    <div class="ringWrap"><div id="ring" class="ring"></div></div>
   </section>
 
   <!-- Block: Resultate -->
@@ -209,6 +212,7 @@ const sessionListEl = document.getElementById('sessionList');
 const clearSessionsBtn = document.getElementById('clearSessions');
 
 let btcClicks=0, btcOverride=false;
+let autoSavePromptShown=false;
 
 function loadBtcOverride(){
   btcOverride=false;
@@ -252,10 +256,33 @@ function getRingCenter(){
   return { cx: width/2, cy: height/2 };
 }
 function buildRing(){ ring.innerHTML=''; const marker=document.createElement('div'); marker.id='marker'; marker.className='marker'; ring.appendChild(marker); const r=RADIUS; const {cx,cy}=getRingCenter(); for(let i=0;i<N;i++){ const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); const d=document.createElement('div'); d.className='dot'; d.dataset.i=i; d.style.left=x+'px'; d.style.top=y+'px'; ring.appendChild(d) } placeMarker(pos) }
-function placeMarker(i){ const m=document.getElementById('marker'); const r=RADIUS; const {cx,cy}=getRingCenter(); const a=(i/N)*Math.PI*2 - Math.PI/2; const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a); m.style.left=x+'px'; m.style.top=y+'px' }
+function placeMarker(i){
+  const m=document.getElementById('marker');
+  if(!m) return;
+  const r=RADIUS;
+  const {cx,cy}=getRingCenter();
+  const a=(i/N)*Math.PI*2 - Math.PI/2;
+  const x=cx + r*Math.cos(a), y=cy + r*Math.sin(a);
+  m.style.left=x+'px';
+  m.style.top=y+'px';
+  if(!running && steps===0){
+    m.className='marker prestart';
+  }else if(m.classList.contains('prestart')){
+    m.className='marker';
+  }
+}
 
 function step(){ const dir=Math.random()<0.5?-1:1; pos=(pos+dir+N)%N; steps++; if(dir===1) cw++; else ccw++; hist.push(dir); const marker=document.getElementById('marker'); const hit=(dir===focusDir); if(hit){ hits++; marker.className='marker hit' } else { misses++; marker.className='marker miss' } placeMarker(pos) }
-function loop(){ if(!running) return; const now=Date.now(); if(now>=endAt){ stopExp(); return } step(); timer=requestAnimationFrame(()=> setTimeout(loop, interval)) }
+function loop(){
+  if(!running) return;
+  const now=Date.now();
+  if(now>=endAt){
+    stopExp(true);
+    return;
+  }
+  step();
+  timer=requestAnimationFrame(()=> setTimeout(loop, interval));
+}
 function startExp(){
   if(running) return;
   resetExp();
@@ -271,17 +298,28 @@ function startExp(){
   applyThemeFromDuration();
   loop();
 }
-function stopExp(){
+function stopExp(autoTriggered=false){
   if(!running) return;
   running=false;
   toggleBtn.textContent='Experiment starten';
+  if(timer){ cancelAnimationFrame(timer); timer=null; }
   drawChart();
   showSummary();
+  if(autoTriggered && !autoSavePromptShown && steps>0){
+    autoSavePromptShown=true;
+    if(typeof window!=='undefined' && window.confirm('Session speichern?')){
+      if(typeof saveBtn.onclick==='function'){
+        saveBtn.onclick();
+      }else if(typeof saveBtn.click==='function'){
+        saveBtn.click();
+      }
+    }
+  }
   const endedAt=Date.now();
   const uploadPayload=makeUploadPayload(endedAt);
   if(uploadPayload) submitExperimentData(uploadPayload);
 }
-function resetExp(){ cancelAnimationFrame(timer); running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; btcClicks=0; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
+function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); summary.textContent=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height) }
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
 function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const hasOverride=btcOverride===true; ring.classList.toggle('btc', is21 || hasOverride) }
@@ -330,9 +368,15 @@ function makeUploadPayload(endTs){
 }
 
 // Events
-toggleBtn.onclick = ()=> running ? stopExp() : startExp();
+toggleBtn.onclick = ()=> running ? stopExp(false) : startExp();
 resetBtn.onclick = resetExp;
 durSel.onchange = applyThemeFromDuration;
+startSel.onchange = ()=>{
+  if(running) return;
+  const selected=Number(startSel.value);
+  pos=Number.isFinite(selected)?selected:0;
+  placeMarker(pos);
+};
 focusSel.onchange = (e)=>{ focusDir=(e.target.value==='cw')?1:-1 };
 saveBtn.onclick = ()=>{ const rec=currentSessionRecord(); sessions.push(rec); if(!persistSessions()){ makeDownload('session-lokal.json','application/json', JSON.stringify(rec, null, 2)) } updateSessionList(); if(sessions.length>=200){ storageNoteEl.textContent='Viele Sessions gespeichert - bitte regelmaessig exportieren.' } };
 exportJSONBtn.onclick = exportAllJSON;
