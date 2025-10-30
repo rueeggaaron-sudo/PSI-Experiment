@@ -1,1 +1,58 @@
-<!doctype html><html lang='de'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Datenschutz</title><style>body{font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica Neue,Arial,sans-serif;padding:2rem;max-width:800px;margin:0 auto;color:#111}h1{font-size:1.8rem;margin:0 0 1rem}p{margin:.75rem 0}</style></head><body><h1>Datenschutz</h1><p>Diese Anwendung erfasst beim Abschluss einer Session anonymisierte Experimentdaten (z. B. Dauer, Schritte, Treffer, Z-/P-Werte). Es werden keine personenbezogenen Daten gespeichert und keine Cookies für Tracking gesetzt.</p><p>Zur Zuordnung mehrerer Sessions derselben Person wird im Browser eine zufällige, anonyme Kennung (UID) erzeugt und lokal gespeichert. Diese UID erlaubt keine Rückschlüsse auf die Identität.</p><p>Die Daten werden in projektgebundenem Speicher (Vercel Blob) abgelegt. Aufbewahrung/Export projektabhängig. Auf Anfrage werden Daten gelöscht.</p><p>Kontakt: [Firma/Adresse/E-Mail einsetzen]</p></body></html>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Datenschutz</title>
+  <style>
+    body{font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica Neue,Arial,sans-serif;padding:2rem;max-width:780px;margin:0 auto;color:#111;background:#f7f7f7}
+    h1{font-size:1.8rem;margin:0 0 1rem;color:#000}
+    h2{font-size:1.2rem;margin:1.5rem 0 .5rem;color:#222}
+    p{margin:.8rem 0}
+    ul{padding-left:1.2rem;margin:.6rem 0}
+    li{margin:.4rem 0}
+    strong{color:#000}
+  </style>
+</head>
+<body>
+  <h1>Datenschutz</h1>
+  <p>
+    Dieses Experiment ist ein freiwilliger Selbsttest zum Thema Psychokinese – eine quasi-metaphysische Fingerübung,
+    die ohne personenbezogene Angaben funktioniert. Wir sammeln nur Datenpunkte, die nötig sind, um den Verlauf
+    einer Session statistisch auszuwerten.
+  </p>
+
+  <h2>Welche Daten entstehen?</h2>
+  <ul>
+    <li>technische Kennzahlen der Session (Dauer, Schrittgeschwindigkeit, Startfeld, Fokusrichtung)</li>
+    <li>Zufallsausgänge pro Richtung sowie berechnete Treffer- und Fehlversuche</li>
+    <li>abgeleitete Statistikwerte wie Differenz, z- und p-Wert</li>
+    <li>eine zufällig erzeugte, anonyme Browser-UID (lokal gespeichert, kein Personenbezug)</li>
+  </ul>
+
+  <h2>Warum speichern wir das?</h2>
+  <p>
+    Die Daten dienen ausschließlich der Auswertung des Experiments: Trends erkennen, Session-Verläufe vergleichen,
+    Hypothesen über mentale Fokussierung testen. Es existiert kein wirtschaftliches Tracking, kein Profiling und
+    kein Abgleich mit anderen Quellen.
+  </p>
+
+  <h2>Wie wird gespeichert?</h2>
+  <p>
+    Die Session-Datensätze werden als einzelne JSON-Dateien im projectbezogenen Speicher bei Vercel abgelegt.
+    Es gibt keine Weitergabe an Dritte. Lokal kannst du deine Sessions jederzeit über die Export- bzw.
+    Löschfunktionen entfernen; dabei wird auch die anonyme UID in deinem Browser gelöscht.
+  </p>
+
+  <h2>Was gibt es sonst zu wissen?</h2>
+  <ul>
+    <li>Es werden keine Cookies oder Fingerprinting-Techniken zur Wiedererkennung eingesetzt.</li>
+    <li>Der Server sieht nur anonymisierte Sessiondaten; IP-Adressen werden nicht persistiert.</li>
+    <li>Du kannst das Experiment ohne Zustimmung zum Upload nutzen (rein lokal).</li>
+  </ul>
+
+  <p>
+    Fragen zum Projekt oder zum Umgang mit den Daten kannst du jederzeit direkt im Repository stellen.
+  </p>
+</body>
+</html>
