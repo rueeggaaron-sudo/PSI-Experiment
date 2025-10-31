@@ -1,5 +1,11 @@
 # Science Notes · Daten & Auswertung (Stand: 2025-10-30)
 
+# Science Notes · Daten & Auswertung (Stand: 2025-10-30)
+
+Bist du der nächste Mental Master – oder der G of Qi?
+Dieses Experiment basiert auf realen Eigenbeobachtungen geistiger Einflussnahme auf physische Systeme.
+Ziel ist, diese Effekte unter reproduzierbaren Bedingungen sichtbar zu machen – ohne Trick, ohne Glaube, ohne Dogma.
+
 ## Ziel
 Ergebnisse so erfassen, dass sichtbar wird, **wie stark sie vom Zufall abweichen** – ohne PII, ohne Tracking.
 
