@@ -86,6 +86,12 @@
   .example-toggle input{width:18px;height:18px}
   @media(max-width:767px){.chart-options{justify-content:center}}
 
+  .chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;color:var(--muted);font-size:13px;align-items:center}
+  .legend-item{display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .legend-swatch{width:28px;height:6px;border-radius:4px;display:inline-block;background:rgba(255,255,255,0.6)}
+  .legend-swatch.line{height:4px}
+  .legend-swatch.fill{height:12px;opacity:0.45}
+
   .summary-note{display:block;font-size:13px;color:var(--muted);margin-top:6px}
   .result-wrap{max-width:980px;margin:0 auto;padding:0 16px}
   .result-head{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:18px;text-align:center}
@@ -95,9 +101,13 @@
   .result-pvalue{font-weight:600}
   .result-info{max-width:640px;margin:0;color:var(--muted);font-size:14px}
   .result-note{margin:0;color:var(--muted);font-size:13px}
+  .result-target{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);width:100%}
+  .result-target-info{margin:0;color:var(--muted);font-size:13px;text-align:center;max-width:560px}
   @media(min-width:768px){
     .result-key{flex-direction:row;gap:18px}
     .result-accuracy{font-size:64px}
+    .result-target{flex-direction:row;justify-content:center;text-align:left}
+    .result-target-info{text-align:left}
   }
   #chartDetails{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;margin-bottom:16px}
   #chartDetails summary{cursor:pointer;font-weight:600;list-style:none}
@@ -186,7 +196,11 @@
         <select id="start"></select>
       </label>
       <label>Zielrichtung
-        <select id="focus"><option value="cw">Uhrzeigersinn</option><option value="ccw">Gegenuhrzeigersinn</option></select>
+        <select id="focus">
+          <option value="none" selected>Keine Vorgabe</option>
+          <option value="cw">Uhrzeigersinn</option>
+          <option value="ccw">Gegenuhrzeigersinn</option>
+        </select>
       </label>
     </div>
     <div class="ringWrap"><div id="ring" class="ring"></div></div>
@@ -202,17 +216,28 @@
       <h2>Resultate</h2>
       <div class="result-head">
         <div class="result-key">
-          <span id="resultAccuracy" class="result-accuracy">--.-%</span>
+          <span id="biasValue" class="result-accuracy">--.-%</span>
           <div class="result-pwrap">
-            <span class="result-pvalue">p = <span id="resultPValue">--</span></span>
-            <span id="resultBadge" class="badge tier-random">im Zufallsbereich</span>
+            <span class="result-pvalue">p = <span id="biasPValue">--</span></span>
+            <span id="biasBadge" class="badge tier-random">im Zufallsbereich</span>
           </div>
         </div>
-        <p class="result-info">Trefferquote: Anteil korrekter Schritte. p schätzt die Zufalls-Wahrscheinlichkeit; je kleiner, desto auffälliger.</p>
-        <p class="result-note">p ≥ 0.10 → im Zufallsbereich. 0.05 ≤ p &lt; 0.10 → leichte Tendenz. Je kleiner p, desto deutlicher die energetische Einflussnahme.</p>
+        <p class="result-info">Bias misst die Abweichung von 50&nbsp;% unabhängig von der Richtung.</p>
+        <p class="result-note">p ≥ 0.10 → Zufallsbereich. 0.05 ≤ p &lt; 0.10 → leicht. 0.01 ≤ p &lt; 0.05 → auffällig. 0.001 ≤ p &lt; 0.01 → sehr auffällig. p &lt; 0.001 → extrem auffällig.</p>
+        <div id="targetMetrics" class="result-target" hidden aria-hidden="true">
+          <div class="result-key">
+            <span id="targetValue" class="result-accuracy">--.-%</span>
+            <div class="result-pwrap">
+              <span class="result-pvalue">p = <span id="targetPValue">--</span></span>
+              <span id="targetBadge" class="badge tier-random">im Zufallsbereich</span>
+            </div>
+          </div>
+          <p id="targetInfo" class="result-info result-target-info">Ziel-Trefferquote: Anteil der Schritte in der gewählten Richtung.</p>
+        </div>
       </div>
       <details id="chartDetails" open>
         <summary>Details (Diagramm)</summary>
+        <div id="chartLegend" class="chart-legend"></div>
         <div class="chart-options">
           <label class="example-toggle">
             <input type="checkbox" id="exampleToggle" />
@@ -221,7 +246,7 @@
         </div>
         <canvas id="chart"></canvas>
       </details>
-      <p id="exampleGuidance" class="summary-note">Beispielkurven nutzen dieselben Eckdaten (Dauer/Schritte/Speed), variieren nur die Trefferquote und die Bewertung.</p>
+      <p id="exampleGuidance" class="summary-note">Beispielkurven zeigen trainierte Intention (stark vs. sehr stark) mit realistischen Schwankungen – gleiche Eckdaten, andere Tendenz.</p>
       <p id="exampleActiveNote" class="summary-note" hidden aria-live="polite">Beispiele dienen der Orientierung und sind nicht Teil deiner Session.</p>
       <div id="summary" class="note"></div>
       <div class="actions">
@@ -260,20 +285,31 @@ const TRAIL_LEN = 6;    // Laenge der Trail‑Spur (optisch)
 
 // State & Elemente
 let pos=0, steps=0, cw=0, ccw=0, hits=0, misses=0;
-let trail=[], hist=[], running=false, endAt=0, startedAt=0, interval=800, timer=null, focusDir=1;
+let trail=[], hist=[], running=false, endAt=0, startedAt=0, interval=800, timer=null;
+let focusDir=0;
+let targetMode='none';
 const ring = document.getElementById('ring');
 const startSel = document.getElementById('start');
 const durSel = document.getElementById('duration');
 const speedInp = document.getElementById('speed');
 const focusSel = document.getElementById('focus');
 const chart = document.getElementById('chart');
+if(chart){
+  chart.setAttribute('title','Bias misst die Abweichung von 50 % unabhängig von der Richtung.');
+}
 const summary = document.getElementById('summary');
 const chartDetails = document.getElementById('chartDetails');
 const exampleToggle = document.getElementById('exampleToggle');
 const exampleActiveNote = document.getElementById('exampleActiveNote');
-const accuracyEl = document.getElementById('resultAccuracy');
-const pValueEl = document.getElementById('resultPValue');
-const pBadgeEl = document.getElementById('resultBadge');
+const chartLegend = document.getElementById('chartLegend');
+const biasValueEl = document.getElementById('biasValue');
+const biasPValueEl = document.getElementById('biasPValue');
+const biasBadgeEl = document.getElementById('biasBadge');
+const targetMetricsEl = document.getElementById('targetMetrics');
+const targetValueEl = document.getElementById('targetValue');
+const targetPValueEl = document.getElementById('targetPValue');
+const targetBadgeEl = document.getElementById('targetBadge');
+const targetInfoEl = document.getElementById('targetInfo');
 const toggleBtn = document.getElementById('toggle');
 const resetBtn = document.getElementById('reset');
 const saveBtn = document.getElementById('saveSession');
@@ -301,6 +337,16 @@ let showExampleCurves=false;
 function loadBtcOverride(){
   btcOverride=false;
   btcClicks=0;
+}
+
+function setTargetMode(value){
+  if(value==='cw' || value==='ccw'){
+    targetMode=value;
+    focusDir=value==='cw'?1:-1;
+  }else{
+    targetMode='none';
+    focusDir=0;
+  }
 }
 
 function handleRingPointer(e){
@@ -350,6 +396,15 @@ function updateExampleNote(){
   }
 }
 
+function renderLegend(items){
+  if(!chartLegend) return;
+  chartLegend.innerHTML = items.map(item=>{
+    const typeClass = item.type==='fill' ? 'legend-swatch fill' : 'legend-swatch line';
+    const style = `style="background:${item.type==='fill'?item.color: item.color};"`;
+    return `<span class="legend-item"><span class="${typeClass}" ${style}></span><span>${item.label}</span></span>`;
+  }).join('');
+}
+
 function refreshExamplesAfterConfig(){
   if(!showExampleCurves || running) return;
   requestAnimationFrame(drawChart);
@@ -368,7 +423,19 @@ function exportAllCSV(){ makeDownload('sessions.csv','text/csv', toCSV(sessions)
 sessionListEl.addEventListener('click', (e)=>{ const btn=e.target.closest('button'); if(!btn) return; const tr=e.target.closest('tr'); if(!tr) return; const i=Number(tr.dataset.i); const s=sessions[i]; if(!s) return; const act=btn.dataset.action; if(act==='del'){ sessions.splice(i,1); persistSessions(); updateSessionList() } else if(act==='dljson'){ makeDownload('session_'+i+'.json','application/json', JSON.stringify(s, null, 2)) } else if(act==='dlcsv'){ makeDownload('session_'+i+'.csv','text/csv', toCSV([s])) } })
 
 // Init UI
-function init(){ startSel.innerHTML=''; for(let i=0;i<N;i++){ const o=document.createElement('option'); o.value=i; o.textContent='Feld '+(i+1); startSel.appendChild(o) } buildRing(); applyThemeFromDuration() }
+function init(){
+  startSel.innerHTML='';
+  for(let i=0;i<N;i++){
+    const o=document.createElement('option');
+    o.value=i;
+    o.textContent='Feld '+(i+1);
+    startSel.appendChild(o);
+  }
+  buildRing();
+  setTargetMode(focusSel.value);
+  applyThemeFromDuration();
+  showSummary();
+}
 function getRingCenter(){
   const styles=getComputedStyle(ring);
   const width=ring.clientWidth||Number.parseFloat(styles.width)||ring.offsetWidth||0;
@@ -392,7 +459,29 @@ function placeMarker(i){
   }
 }
 
-function step(){ const dir=Math.random()<0.5?-1:1; pos=(pos+dir+N)%N; steps++; if(dir===1) cw++; else ccw++; hist.push(dir); const marker=document.getElementById('marker'); const hit=(dir===focusDir); if(hit){ hits++; marker.className='marker hit' } else { misses++; marker.className='marker miss' } placeMarker(pos) }
+function step(){
+  const dir=Math.random()<0.5?-1:1;
+  pos=(pos+dir+N)%N;
+  steps++;
+  if(dir===1) cw++; else ccw++;
+  hist.push(dir);
+  const marker=document.getElementById('marker');
+  const hasTarget=focusDir!==0;
+  if(marker){
+    if(hasTarget){
+      if(dir===focusDir){
+        hits++;
+        marker.className='marker hit';
+      }else{
+        misses++;
+        marker.className='marker miss';
+      }
+    }else{
+      marker.className='marker';
+    }
+  }
+  placeMarker(pos);
+}
 function loop(){
   if(!running) return;
   const now=Date.now();
@@ -405,6 +494,7 @@ function loop(){
 }
 function startExp(){
   if(running) return;
+  setTargetMode(focusSel.value);
   resetExp();
   running=true;
   syncToggleButton();
@@ -414,8 +504,8 @@ function startExp(){
   endAt=startedAt + mins*60*1000;
   interval=Number(speedInp.value)||800;
   if(interval<10) interval=10;
-  focusDir=(focusSel.value==='cw')?1:-1;
   applyThemeFromDuration();
+  refreshExamplesAfterConfig();
   loop();
 }
 function stopExp(autoTriggered=false){
@@ -439,7 +529,52 @@ function stopExp(autoTriggered=false){
   const uploadPayload=makeUploadPayload(endedAt);
   if(uploadPayload) submitExperimentData(uploadPayload);
 }
-function resetExp(){ cancelAnimationFrame(timer); timer=null; running=false; syncToggleButton(); steps=0; cw=0; ccw=0; hits=0; misses=0; hist=[]; lastStats=null; startedAt=0; endAt=0; saveBtn.disabled=true; autoSavePromptShown=false; btcClicks=0; chartHoverHighlight=null; chartHoverData=null; chartTooltip.classList.remove('visible'); chartTooltip.setAttribute('aria-hidden','true'); pos=Number(startSel.value)||0; const m=document.getElementById('marker'); if(m) m.className='marker'; placeMarker(pos); if(accuracyEl){ accuracyEl.textContent='--.-%'; accuracyEl.classList.remove('mastermystic'); } if(pValueEl) pValueEl.textContent='--'; if(pBadgeEl){ pBadgeEl.className='badge tier-random'; pBadgeEl.textContent='im Zufallsbereich'; } summary.innerHTML=''; const ctx=chart.getContext('2d'); ctx.clearRect(0,0,chart.width,chart.height); if(showExampleCurves){ requestAnimationFrame(drawChart); } }
+function resetExp(){
+  cancelAnimationFrame(timer);
+  timer=null;
+  running=false;
+  syncToggleButton();
+  steps=0;
+  cw=0;
+  ccw=0;
+  hits=0;
+  misses=0;
+  hist=[];
+  lastStats=null;
+  startedAt=0;
+  endAt=0;
+  saveBtn.disabled=true;
+  autoSavePromptShown=false;
+  btcClicks=0;
+  chartHoverHighlight=null;
+  chartHoverData=null;
+  chartTooltip.classList.remove('visible');
+  chartTooltip.setAttribute('aria-hidden','true');
+  setTargetMode(focusSel.value);
+  pos=Number(startSel.value)||0;
+  const m=document.getElementById('marker');
+  if(m) m.className='marker';
+  placeMarker(pos);
+  if(biasValueEl){
+    biasValueEl.textContent='--.-%';
+    biasValueEl.classList.remove('mastermystic');
+  }
+  if(biasPValueEl) biasPValueEl.textContent='--';
+  if(biasBadgeEl){ biasBadgeEl.className='badge tier-random'; biasBadgeEl.textContent='im Zufallsbereich'; }
+  if(targetMetricsEl){
+    targetMetricsEl.hidden=true;
+    targetMetricsEl.setAttribute('aria-hidden','true');
+  }
+  if(targetValueEl) targetValueEl.textContent='--.-%';
+  if(targetPValueEl) targetPValueEl.textContent='--';
+  if(targetBadgeEl){ targetBadgeEl.className='badge tier-random'; targetBadgeEl.textContent='im Zufallsbereich'; }
+  summary.innerHTML='';
+  const ctx=chart.getContext('2d');
+  ctx.clearRect(0,0,chart.width,chart.height);
+  if(showExampleCurves){
+    requestAnimationFrame(drawChart);
+  }
+}
 
 // EDIT: THEME‑LOGIK (BTC bei 21 Minuten)
 function applyThemeFromDuration(){ const is21=String(durSel.value)==='21'; const hasOverride=btcOverride===true; ring.classList.toggle('btc', is21 || hasOverride) }
@@ -460,19 +595,45 @@ function estimatePlannedSteps(){
 function buildExampleCurves(totalSteps){
   const steps=Math.max(1, totalSteps||0);
   if(!showExampleCurves || !steps) return [];
+  if(focusDir===0){
+    setTargetMode('cw');
+  }
   const direction=(focusDir===-1)?-1:1;
   const defs=[
-    {rate:0.65,label:'Beispielkurve – stark (≈ 65 % Treffer)', color:okStrokeColor, alpha:0.55, width:3},
-    {rate:0.75,label:'Beispielkurve – extrem (≈ 75 % Treffer)', color:projectOrange, alpha:0.7, width:3.5}
+    {rate:0.62,label:'Beispiel: starke Intention (~62 % Bias)', color:okStrokeColor, alpha:0.55, width:3, seed:19},
+    {rate:0.67,label:'Beispiel: sehr starke Intention (~67 % Bias)', color:projectOrange, alpha:0.7, width:3.6, seed:37}
   ];
+  const slumpZones=[
+    {start:0.22,end:0.32,drop:0.075},
+    {start:0.50,end:0.64,drop:0.095}
+  ];
+  const pseudoRandom=(i, seed)=>{
+    const x=Math.sin((i+1)*(seed+1)*12.9898)*43758.5453;
+    return x - Math.floor(x);
+  };
   return defs.map(def=>{
-    const slope=(2*def.rate-1)*direction;
-    const values=[];
-    for(let i=0;i<=steps;i++){
-      const progress=steps?i/steps:0;
-      const base=slope*i;
-      const modulation=Math.sin(progress*Math.PI)*slope*0.35;
-      values.push(base+modulation);
+    const values=[0];
+    let cumulative=0;
+    let streak=0;
+    for(let i=1;i<=steps;i++){
+      const progress=i/steps;
+      let rate=def.rate;
+      slumpZones.forEach(zone=>{
+        if(progress>=zone.start && progress<=zone.end){
+          const span=zone.end-zone.start||1;
+          const local=(progress-zone.start)/span;
+          rate -= Math.sin(local*Math.PI)*zone.drop;
+        }
+      });
+      const breathing=Math.sin(progress*Math.PI*2.2)*(def.rate-0.5)*0.22;
+      const jitter=(pseudoRandom(i, def.seed)-0.5)*0.12;
+      rate = Math.max(0.52, Math.min(0.68, rate + breathing + jitter));
+      const stepNoise=pseudoRandom(i*13, def.seed+7);
+      const success=stepNoise < rate;
+      streak = success ? Math.max(-1, streak)+1 : Math.min(1, streak)-1;
+      cumulative += success ? direction : -direction;
+      const displayShift=Math.tanh(streak/6)*0.6;
+      values.push(cumulative + displayShift);
     }
     return {...def, values};
   });
@@ -618,58 +779,17 @@ function drawChart(){
     ctx.arc(lastX,lastY,6,0,Math.PI*2);
     ctx.fill();
   }
-
   const legendItems=[
-    {label:'Kumulierte Tendenz', type:'line', color:'rgba(124,255,107,0.9)', width:4, alpha:1},
-    {label:'Null-Linie', type:'line', color:'rgba(160,170,180,0.55)', width:3, alpha:1},
-    {label:'Zufallsband (95 %)', type:'fill', color:'rgba(124,180,255,0.28)'}
+    {label:'Kumulierte Tendenz', type:'line', color:'rgba(124,255,107,0.9)'},
+    {label:'Null-Linie', type:'line', color:'rgba(160,170,180,0.55)'},
+    {label:'Zufallsband (Bias)', type:'fill', color:'rgba(124,180,255,0.28)'}
   ];
-  exampleCurves.forEach(curve=>{
-    legendItems.push({label:curve.label, type:'line', color:curve.color, width:curve.width, alpha:curve.alpha});
-  });
-
-  const legendScale=cssW<540?0.85:1;
-  const legendPadding=18*legendScale;
-  const legendRowHeight=30*legendScale;
-  const legendWidth=Math.min(360, Math.max(220, w*0.45))*legendScale;
-  const legendHeight=legendPadding*2 + legendItems.length*legendRowHeight;
-  const legendX=pad + 14;
-  const legendY=pad + 14;
-  ctx.save();
-  roundedRectPath(ctx, legendX, legendY, legendWidth, legendHeight, 14*legendScale);
-  ctx.fillStyle='rgba(12,18,24,0.58)';
-  ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.08)';
-  ctx.stroke();
-  ctx.restore();
-
-  const legendFontSize=Math.max(14, Math.round(20*legendScale));
-  ctx.font=`${legendFontSize}px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial`;
-  ctx.textAlign='left';
-  ctx.textBaseline='middle';
-  const legendLineX=legendX + legendPadding;
-  let legendRowY=legendY + legendPadding + legendRowHeight/2;
-  legendItems.forEach(item=>{
-    if(item.type==='line'){
-      ctx.save();
-      ctx.globalAlpha=item.alpha ?? 1;
-      ctx.strokeStyle=item.color;
-      ctx.lineWidth=item.width||3;
-      ctx.beginPath();
-      ctx.moveTo(legendLineX, legendRowY);
-      ctx.lineTo(legendLineX + 54*legendScale, legendRowY);
-      ctx.stroke();
-      ctx.restore();
-    }else if(item.type==='fill'){
-      ctx.save();
-      ctx.fillStyle=item.color;
-      ctx.fillRect(legendLineX, legendRowY-10*legendScale, 54*legendScale, 20*legendScale);
-      ctx.restore();
-    }
-    ctx.fillStyle='rgba(235,239,242,.88)';
-    ctx.fillText(item.label, legendLineX + 66*legendScale, legendRowY);
-    legendRowY += legendRowHeight;
-  });
+  if(showExampleCurves){
+    exampleCurves.forEach(curve=>{
+      legendItems.push({label:curve.label, type:'line', color:curve.color});
+    });
+  }
+  renderLegend(legendItems);
 
   chartHoverData={
     points:[],
@@ -781,7 +901,7 @@ function handleChartHover(evt){
     hideChartTooltip();
     return;
   }
-  chartTooltip.innerHTML=`<strong>Schritt ${refreshed.idx}</strong><br>Kumuliert: ${refreshed.value.toFixed(2)}<br>Richtung: ${refreshed.dir}`;
+  chartTooltip.innerHTML=`<strong>Schritt ${refreshed.idx}</strong><br>Kumuliert: ${refreshed.value.toFixed(2)}<br>Richtung: ${refreshed.dir}<br><small>Bias misst die Abweichung von 50&nbsp;% unabhängig von der Richtung.</small>`;
   chartTooltip.style.left=`${clientX+16}px`;
   chartTooltip.style.top=`${clientY+16}px`;
   chartTooltip.classList.add('visible');
@@ -789,46 +909,125 @@ function handleChartHover(evt){
 }
 function erf(x){ const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911; const sign=x<0?-1:1; x=Math.abs(x); const t=1/(1+p*x); const y=1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x); return sign*y }
 function pTwoTailFromZ(z){ const phi=0.5*(1+erf(Math.abs(z)/Math.SQRT2)); return 2*(1-phi) }
+function tierFromP(p){
+  if(!Number.isFinite(p)) return {label:'im Zufallsbereich', cls:'tier-random'};
+  if(p>=0.10) return {label:'im Zufallsbereich', cls:'tier-random'};
+  if(p>=0.05) return {label:'leicht überdurchschnittlich', cls:'tier-mild'};
+  if(p>=0.01) return {label:'auffällig', cls:'tier-noticeable'};
+  if(p>=0.001) return {label:'sehr auffällig', cls:'tier-strong'};
+  return {label:'extrem auffällig', cls:'tier-extreme'};
+}
 function showSummary(){
   const total=cw+ccw;
   const diff=cw-ccw;
-  const z = total? (diff)/Math.sqrt(total) : 0;
-  const p = pTwoTailFromZ(z);
-  const targetTxt=(focusDir===1?'Uhrzeigersinn':'Gegenuhrzeigersinn');
-  const acc= total? ((hits/total)*100).toFixed(1) : '0.0';
+  const absDiff=Math.abs(diff);
+  const biasPct=total ? (absDiff/total)*100 : 0;
+  const denom=Math.sqrt(total||1);
+  const biasZ=total ? absDiff/denom : 0;
+  const biasP=pTwoTailFromZ(biasZ);
+  const biasTier=tierFromP(biasP);
+  const biasPctDisplay=biasPct.toFixed(1);
+  const biasPDisplay=biasP<0.001?'< 0.001':biasP.toFixed(3);
+  const biasPDisplayHtml=biasP<0.001?'&lt; 0.001':biasP.toFixed(3);
 
-  const pDisplay = p<0.001 ? '< 0.001' : p.toFixed(3);
-  const pDisplayHtml = p<0.001 ? '&lt; 0.001' : p.toFixed(3);
-  const tier = (p>=0.10)
-    ? {label:'im Zufallsbereich', cls:'tier-random'}
-    : (p>=0.05)
-      ? {label:'leichte Tendenz zu Einflussnahme', cls:'tier-mild'}
-      : (p>=0.01)
-        ? {label:'auffällige energetische Einflussnahme', cls:'tier-noticeable'}
-        : (p>=0.001)
-          ? {label:'sehr starke energetische Einflussnahme', cls:'tier-strong'}
-          : {label:'extrem starke energetische Einflussnahme', cls:'tier-extreme'};
+  const targetActive=targetMode!=='none' && focusDir!==0;
+  const targetLabel=targetActive ? (targetMode==='cw'?'Uhrzeigersinn':'Gegenuhrzeigersinn') : 'keine Vorgabe';
+  let targetAcc=0;
+  let targetZ=0;
+  let targetP=1;
+  let targetPDisplay='--';
+  let targetPDisplayHtml='--';
+  let targetTier=tierFromP(1);
 
-  if(accuracyEl){
-    accuracyEl.textContent=acc+'%';
-    accuracyEl.classList.toggle('mastermystic', tier.cls==='tier-extreme');
+  if(targetActive){
+    targetAcc=total ? (hits/total)*100 : 0;
+    targetZ=total ? (diff*(focusDir||1))/denom : 0;
+    targetP=pTwoTailFromZ(targetZ);
+    targetPDisplay=targetP<0.001?'< 0.001':targetP.toFixed(3);
+    targetPDisplayHtml=targetP<0.001?'&lt; 0.001':targetP.toFixed(3);
+    targetTier=tierFromP(targetP);
   }
-  if(pValueEl) pValueEl.textContent=pDisplay;
-  if(pBadgeEl){ pBadgeEl.className='badge '+tier.cls; pBadgeEl.textContent=tier.label; }
+
+  if(biasValueEl){
+    biasValueEl.textContent=biasPctDisplay+'%';
+    biasValueEl.classList.toggle('mastermystic', biasTier.cls==='tier-extreme');
+  }
+  if(biasPValueEl) biasPValueEl.textContent=biasPDisplay;
+  if(biasBadgeEl){ biasBadgeEl.className='badge '+biasTier.cls; biasBadgeEl.textContent=biasTier.label; }
+
+  if(targetMetricsEl){
+    if(targetActive){
+      targetMetricsEl.hidden=false;
+      targetMetricsEl.setAttribute('aria-hidden','false');
+      if(targetValueEl){
+        targetValueEl.textContent=targetAcc.toFixed(1)+'%';
+        targetValueEl.classList.toggle('mastermystic', targetTier.cls==='tier-extreme');
+      }
+      if(targetPValueEl) targetPValueEl.textContent=targetPDisplay;
+      if(targetBadgeEl){ targetBadgeEl.className='badge '+targetTier.cls; targetBadgeEl.textContent=targetTier.label; }
+      if(targetInfoEl) targetInfoEl.textContent='Ziel-Trefferquote ('+targetLabel+'): Anteil der Schritte in der gewählten Richtung.';
+    }else{
+      targetMetricsEl.hidden=true;
+      targetMetricsEl.setAttribute('aria-hidden','true');
+    }
+  }
 
   const lines=[
-    'Ziel: <b>'+targetTxt+'</b>',
+    'Zielvorgabe: <b>'+targetLabel+'</b>',
     'Schritte: <b>'+total+'</b> (Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b>)',
-    'Treffer: <b>'+hits+'</b>, Fehlversuche: <b>'+misses+'</b>',
-    'Trefferquote: <b>'+acc+'%</b>',
-    'p-Wert: <b>'+pDisplayHtml+'</b>'
+    'Bias: <b>'+biasPctDisplay+'%</b> – p: <b>'+biasPDisplayHtml+'</b>'
   ];
+  if(targetActive){
+    lines.push('Ziel-Trefferquote: <b>'+targetAcc.toFixed(1)+'%</b> – p: <b>'+targetPDisplayHtml+'</b>');
+  }
+  lines.push('<span class="summary-note">p &lt; 0.05 → eher nicht nur Zufall. p ≥ 0.05 → Zufallsbereich.</span>');
   summary.innerHTML='<div class="summary-lines">'+lines.map(line=>'<div>'+line+'</div>').join('')+'</div>';
 
-  lastStats={z, p, acc:Number(acc)};
+  lastStats={
+    biasZ,
+    biasP,
+    biasPct,
+    targetActive,
+    targetZ: targetActive ? targetZ : null,
+    targetP: targetActive ? targetP : null,
+    targetAcc: targetActive ? targetAcc : null
+  };
   saveBtn.disabled=false;
 }
-function currentSessionRecord(){ const duration=Number(durSel.value)||0; const speed=Number(speedInp.value)||0; const focus=(focusSel.value==='cw'?'Uhrzeigersinn':'Gegenuhrzeigersinn'); return { time:new Date().toISOString(), duration, speed, startField:Number(startSel.value)+1, focus, steps:cw+ccw, cw, ccw, hits, misses, z:lastStats?Number(lastStats.z||((cw-ccw)/Math.sqrt((cw+ccw)||1))):((cw-ccw)/Math.sqrt((cw+ccw)||1)), p:lastStats?Number(lastStats.p||0):0 } }
+function currentSessionRecord(){
+  const duration=Number(durSel.value)||0;
+  const speed=Number(speedInp.value)||0;
+  const total=cw+ccw;
+  const diff=cw-ccw;
+  const absDiff=Math.abs(diff);
+  const biasPct=total ? (absDiff/total)*100 : 0;
+  const denom=Math.sqrt(total||1);
+  const biasZ=total ? absDiff/denom : 0;
+  const biasP=pTwoTailFromZ(biasZ);
+  const focusLabel=targetMode==='cw'?'Uhrzeigersinn':targetMode==='ccw'?'Gegenuhrzeigersinn':'keine Vorgabe';
+  const targetActive=targetMode!=='none' && focusDir!==0;
+  const targetHitRate=targetActive && total ? hits/total : null;
+  const targetZ=targetActive ? (diff*(focusDir||1))/denom : null;
+  const targetP=targetActive && targetZ!==null ? pTwoTailFromZ(targetZ) : null;
+  return {
+    time:new Date().toISOString(),
+    duration,
+    speed,
+    startField:Number(startSel.value)+1,
+    focus:focusLabel,
+    steps:total,
+    cw,
+    ccw,
+    hits:targetActive?hits:0,
+    misses:targetActive?misses:0,
+    bias_pct:Number(biasPct.toFixed(2)),
+    z:biasZ,
+    p:biasP,
+    target_hit_rate:targetHitRate!==null?Number(targetHitRate.toFixed(4)):null,
+    target_z:targetZ,
+    target_p:targetP
+  };
+}
 
 function makeUploadPayload(endTs){
   const totalSteps=cw+ccw;
@@ -841,14 +1040,19 @@ function makeUploadPayload(endTs){
   const speedMs=(Number.isFinite(speedInput) && speedInput>0)?speedInput:Math.max(0, interval);
   const startIndex=Number(startSel.value);
   const startField=Number.isFinite(startIndex)?Math.max(1, Math.round(startIndex)+1):1;
-  const focusValue=(focusSel.value==='ccw')?'ccw':'cw';
+  const focusValue=targetMode;
   const diff=cw-ccw;
+  const absDiff=Math.abs(diff);
   const denom=Math.sqrt(totalSteps||1);
-  const fallbackZ=denom?diff/denom:0;
-  const lastZ=lastStats && Number.isFinite(Number(lastStats.z))?Number(lastStats.z):fallbackZ;
-  const safeZ=Number.isFinite(lastZ)?lastZ:0;
-  const lastP=lastStats && Number.isFinite(Number(lastStats.p))?Number(lastStats.p):pTwoTailFromZ(safeZ);
-  const safeP=Number.isFinite(lastP)?Math.min(Math.max(lastP,0),1):Math.min(Math.max(pTwoTailFromZ(safeZ),0),1);
+  const fallbackBiasZ=denom?absDiff/denom:0;
+  const lastBiasZ=lastStats && Number.isFinite(Number(lastStats.biasZ))?Number(lastStats.biasZ):fallbackBiasZ;
+  const safeBiasZ=Number.isFinite(lastBiasZ)?lastBiasZ:0;
+  const lastBiasP=lastStats && Number.isFinite(Number(lastStats.biasP))?Number(lastStats.biasP):pTwoTailFromZ(safeBiasZ);
+  const safeBiasP=Number.isFinite(lastBiasP)?Math.min(Math.max(lastBiasP,0),1):Math.min(Math.max(pTwoTailFromZ(safeBiasZ),0),1);
+  const targetActive=focusValue!=='none' && focusDir!==0;
+  const targetZ=targetActive? (diff*(focusDir||1))/denom : null;
+  const targetP=targetZ!==null?Math.min(Math.max(pTwoTailFromZ(targetZ),0),1):null;
+  const targetHitRate=targetActive?hits/totalSteps:null;
   return {
     ts:safeEnd,
     duration_min:Number(Math.max(0, durationMinutes).toFixed(4)),
@@ -858,10 +1062,14 @@ function makeUploadPayload(endTs){
     steps:totalSteps,
     cw,
     ccw,
-    hits,
-    misses,
-    z:safeZ,
-    p:safeP
+    hits:targetActive?hits:0,
+    misses:targetActive?misses:0,
+    bias_pct:Number((totalSteps? (absDiff/totalSteps*100):0).toFixed(4)),
+    z:safeBiasZ,
+    p:safeBiasP,
+    target_z:targetZ,
+    target_p:targetP,
+    hit_rate:targetHitRate!==null?Number(targetHitRate.toFixed(4)):null
   };
 }
 
@@ -875,7 +1083,15 @@ startSel.onchange = ()=>{
   pos=Number.isFinite(selected)?selected:0;
   placeMarker(pos);
 };
-focusSel.onchange = (e)=>{ focusDir=(e.target.value==='cw')?1:-1; refreshExamplesAfterConfig(); };
+focusSel.onchange = (e)=>{
+  setTargetMode(e.target.value);
+  refreshExamplesAfterConfig();
+  if(!running){
+    hits=0;
+    misses=0;
+    showSummary();
+  }
+};
 if(speedInp){
   const handleSpeedChange=()=>{ refreshExamplesAfterConfig(); };
   speedInp.addEventListener('change', handleSpeedChange);
@@ -884,6 +1100,15 @@ if(speedInp){
 if(exampleToggle){
   exampleToggle.addEventListener('change', ()=>{
     showExampleCurves=!!exampleToggle.checked;
+    if(showExampleCurves && targetMode==='none'){
+      focusSel.value='cw';
+      setTargetMode('cw');
+      if(!running){
+        hits=0;
+        misses=0;
+        showSummary();
+      }
+    }
     updateExampleNote();
     hideChartTooltip();
     requestAnimationFrame(drawChart);
@@ -901,7 +1126,50 @@ chart.addEventListener('touchend', hideChartTooltip);
 chart.addEventListener('touchcancel', hideChartTooltip);
 
 // Tests (Konsole, optional)
-function runTests(){ const orig=Math.random; try{ Math.random=()=>0.9; const cw0=cw, ccw0=ccw; step(); console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc'); Math.random=()=>0.1; const cw1=cw, ccw1=ccw; step(); console.assert(ccw===ccw1+1 && cw===ccw1, 'ccw inc'); const originalDur=durSel.value; const hadOverride=btcOverride; durSel.value='21'; applyThemeFromDuration(); console.assert(ring.classList.contains('btc'), 'btc on 21'); durSel.value='1'; applyThemeFromDuration(); if(!hadOverride){ console.assert(!ring.classList.contains('btc'), 'btc off') } const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]); console.assert(csv.startsWith('time,'),'csv header'); console.assert(csv.indexOf('\n')!==-1,'csv newline'); cw=5; ccw=5; hits=5; misses=5; showSummary(); console.assert(saveBtn.disabled===false,'save enabled'); durSel.value=originalDur; applyThemeFromDuration() } catch(e){ console.warn('tests failed', e) } finally { Math.random=orig; resetExp() } }
+function runTests(){
+  const orig=Math.random;
+  const originalFocusValue=focusSel.value;
+  try{
+    focusSel.value='cw';
+    setTargetMode('cw');
+    Math.random=()=>0.9;
+    const cw0=cw, ccw0=ccw;
+    step();
+    console.assert(cw===cw0+1 && ccw===ccw0, 'cw inc');
+    Math.random=()=>0.1;
+    const cw1=cw, ccw1=ccw;
+    step();
+    console.assert(ccw===ccw1+1 && cw===cw1, 'ccw inc');
+    const originalDur=durSel.value;
+    const hadOverride=btcOverride;
+    durSel.value='21';
+    applyThemeFromDuration();
+    console.assert(ring.classList.contains('btc'), 'btc on 21');
+    durSel.value='1';
+    applyThemeFromDuration();
+    if(!hadOverride){
+      console.assert(!ring.classList.contains('btc'), 'btc off');
+    }
+    const csv=toCSV([{time:'t',duration:1,speed:800,startField:1,focus:'Uhrzeigersinn',steps:2,cw:1,ccw:1,hits:1,misses:1,z:0,p:1}]);
+    console.assert(csv.startsWith('time,'),'csv header');
+    console.assert(csv.indexOf('\n')!==-1,'csv newline');
+    cw=5;
+    ccw=5;
+    hits=5;
+    misses=5;
+    showSummary();
+    console.assert(saveBtn.disabled===false,'save enabled');
+    durSel.value=originalDur;
+    applyThemeFromDuration();
+  }catch(e){
+    console.warn('tests failed', e);
+  }finally{
+    Math.random=orig;
+    focusSel.value=originalFocusValue;
+    setTargetMode(focusSel.value);
+    resetExp();
+  }
+}
 
 loadBtcOverride();
 loadSessions();
