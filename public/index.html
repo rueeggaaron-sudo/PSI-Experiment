@@ -222,8 +222,8 @@
             <span id="biasBadge" class="badge tier-random">im Zufallsbereich</span>
           </div>
         </div>
-        <p class="result-info">Bias misst die Abweichung von 50&nbsp;% unabhängig von der Richtung.</p>
-        <p class="result-note">p ≥ 0.10 → Zufallsbereich. 0.05 ≤ p &lt; 0.10 → leicht. 0.01 ≤ p &lt; 0.05 → auffällig. 0.001 ≤ p &lt; 0.01 → sehr auffällig. p &lt; 0.001 → extrem auffällig.</p>
+        <p class="result-info">Die Tendenzquote zeigt die laufende Trefferquote relativ zur Zufallslinie (50&nbsp;%). Positive Werte bedeuten mehr Treffer als Zufall, negative entsprechend weniger.</p>
+        <p class="result-note">Das 95&nbsp;%-Band markiert den erwartbaren Zufallsbereich. p ≥ 0.10 → Zufallsbereich. 0.05 ≤ p &lt; 0.10 → leicht. 0.01 ≤ p &lt; 0.05 → auffällig. 0.001 ≤ p &lt; 0.01 → sehr auffällig. p &lt; 0.001 → extrem auffällig.</p>
         <div id="targetMetrics" class="result-target" hidden aria-hidden="true">
           <div class="result-key">
             <span id="targetValue" class="result-accuracy">--.-%</span>
@@ -246,6 +246,7 @@
         </div>
         <canvas id="chart"></canvas>
       </details>
+      <p class="summary-note">Die Tendenzquote bewegt sich zwischen −100&nbsp;% (immer daneben) und +100&nbsp;% (immer richtig). Das schattierte Band zeigt den 95&nbsp;%-Zufallsbereich.</p>
       <p id="exampleGuidance" class="summary-note">Beispielkurven zeigen trainierte Intention (stark vs. sehr stark) mit realistischen Schwankungen – gleiche Eckdaten, andere Tendenz.</p>
       <p id="exampleActiveNote" class="summary-note" hidden aria-live="polite">Beispiele dienen der Orientierung und sind nicht Teil deiner Session.</p>
       <div id="summary" class="note"></div>
@@ -598,14 +599,13 @@ function buildExampleCurves(totalSteps){
   if(focusDir===0){
     setTargetMode('cw');
   }
-  const direction=(focusDir===-1)?-1:1;
   const defs=[
     {rate:0.62,label:'Beispiel: starke Intention (~62 % Bias)', color:okStrokeColor, alpha:0.55, width:3, seed:19},
     {rate:0.67,label:'Beispiel: sehr starke Intention (~67 % Bias)', color:projectOrange, alpha:0.7, width:3.6, seed:37}
   ];
   const slumpZones=[
-    {start:0.22,end:0.32,drop:0.075},
-    {start:0.50,end:0.64,drop:0.095}
+    {start:0.22,end:0.34,drop:0.18},
+    {start:0.52,end:0.66,drop:0.22}
   ];
   const pseudoRandom=(i, seed)=>{
     const x=Math.sin((i+1)*(seed+1)*12.9898)*43758.5453;
@@ -613,8 +613,7 @@ function buildExampleCurves(totalSteps){
   };
   return defs.map(def=>{
     const values=[0];
-    let cumulative=0;
-    let streak=0;
+    let successes=0;
     for(let i=1;i<=steps;i++){
       const progress=i/steps;
       let rate=def.rate;
@@ -625,22 +624,28 @@ function buildExampleCurves(totalSteps){
           rate -= Math.sin(local*Math.PI)*zone.drop;
         }
       });
-      const breathing=Math.sin(progress*Math.PI*2.2)*(def.rate-0.5)*0.22;
-      const jitter=(pseudoRandom(i, def.seed)-0.5)*0.12;
-      rate = Math.max(0.52, Math.min(0.68, rate + breathing + jitter));
-      const stepNoise=pseudoRandom(i*13, def.seed+7);
+      const breathing=Math.sin(progress*Math.PI*2.2)*(def.rate-0.5)*0.18;
+      const jitter=(pseudoRandom(i, def.seed)-0.5)*0.14;
+      rate = Math.max(0.32, Math.min(0.78, rate + breathing + jitter));
+      const stepNoise=pseudoRandom(i*17, def.seed+13);
       const success=stepNoise < rate;
-      streak = success ? Math.max(-1, streak)+1 : Math.min(1, streak)-1;
-      cumulative += success ? direction : -direction;
-      const displayShift=Math.tanh(streak/6)*0.6;
-      values.push(cumulative + displayShift);
+      if(success) successes += 1;
+      const diff=(successes*2) - i;
+      const tendency=(diff / i)*100;
+      values.push(tendency);
     }
     return {...def, values};
   });
 }
 
 function drawChart(){
+  const baseLegend=[
+    {label:'Tendenzquote (laufend)', type:'line', color:'rgba(124,255,107,0.9)'},
+    {label:'Null-Linie (50 %)', type:'line', color:'rgba(160,170,180,0.55)'},
+    {label:'Zufallsband (95 %)', type:'fill', color:'rgba(124,180,255,0.28)'}
+  ];
   if(chartDetails && !chartDetails.open){
+    renderLegend(baseLegend);
     return;
   }
   const ctx=chart.getContext('2d');
@@ -655,55 +660,62 @@ function drawChart(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.lineJoin='round';
   ctx.lineCap='round';
+  ctx.font='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+  ctx.fillStyle='rgba(235,239,242,.8)';
+
+  const yMin=-100;
+  const yMax=100;
+  const valueToY=(val)=>{
+    const clamped=Math.max(yMin, Math.min(yMax, val));
+    const ratio=(clamped - yMin)/(yMax - yMin);
+    return pad + h - ratio*h;
+  };
 
   const stepsCount=hist.length;
-  const cumulative=[0];
-  let runningTotal=0;
-  for(let i=0;i<stepsCount;i++){
-    runningTotal += hist[i];
-    cumulative.push(runningTotal);
-  }
+  const indexToX=(idx)=> pad + (stepsCount ? (idx/stepsCount)*w : 0);
 
-  const estimatedSteps=estimatePlannedSteps();
-  const chartSteps=stepsCount || (showExampleCurves ? Math.max(estimatedSteps,1) : 0);
-  const scaleXFactor=W/(chart.getBoundingClientRect().width||cssW);
-  const scaleYFactor=H/(chart.getBoundingClientRect().height||cssH);
-
-  if(!chartSteps){
-    chartHoverData={
-      points:[],
-      scaleX:scaleXFactor,
-      scaleY:scaleYFactor,
-      indexToX:()=>pad,
-      valueToY:()=>pad + h/2
-    };
-    return;
-  }
-
-  const axisFontSize=cssW<540?24:28;
-  ctx.font=`${axisFontSize}px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial`;
-  ctx.fillStyle='rgba(235,239,242,.82)';
-
-  const indexToX=(idx)=> pad + (chartSteps ? (idx/chartSteps)*w : 0);
-  const midY=pad + h/2;
-
-  const exampleCurves=showExampleCurves ? buildExampleCurves(chartSteps) : [];
-  const outerBand=Math.max(1.96*Math.sqrt(chartSteps||1),1);
-  let maxAbs=outerBand;
-  for(const val of cumulative){
-    const abs=Math.abs(val);
-    if(abs>maxAbs) maxAbs=abs;
-  }
-  for(const curve of exampleCurves){
-    for(const val of curve.values){
-      const abs=Math.abs(val);
-      if(abs>maxAbs) maxAbs=abs;
+  const tendencyValues=[];
+  const rateValues=[];
+  const bandValues=[];
+  let cwCount=0, ccwCount=0, targetSuccess=0;
+  for(let i=1;i<=stepsCount;i++){
+    const dir=hist[i-1];
+    if(dir===1) cwCount++; else ccwCount++;
+    let successCount;
+    let diff=cwCount-ccwCount;
+    if(targetMode!=='none' && focusDir!==0){
+      if(dir===focusDir) targetSuccess++;
+      successCount=targetSuccess;
+      diff=(targetSuccess*2)-i;
+    }else{
+      const best=Math.max(cwCount, ccwCount);
+      successCount=best;
     }
+    const rate=successCount/i;
+    let tendency=(rate - 0.5)*200;
+    if(targetMode==='none' || focusDir===0){
+      const sign=diff===0?0:(diff>0?1:-1);
+      tendency=sign*Math.abs(tendency);
+    }
+    const band=1.96*100*Math.sqrt(0.25 / i);
+    tendencyValues.push(tendency);
+    rateValues.push(rate);
+    bandValues.push(band);
   }
-  const scale=Math.max(maxAbs,1);
-  const valueToY=(val)=> midY - (val/scale)*(h/2*0.95);
 
-  ctx.strokeStyle='rgba(200,205,210,0.42)';
+  const legendItems=[...baseLegend];
+
+  ctx.fillStyle='rgba(235,239,242,.85)';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText('Schritte', pad + w/2, pad+h + 40);
+  ctx.save();
+  ctx.translate(pad-60, pad + h/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText('Tendenzquote (%) (vs. 50 %)', 0, 0);
+  ctx.restore();
+
+  ctx.strokeStyle='rgba(200,205,210,0.45)';
   ctx.lineWidth=2;
   ctx.beginPath();
   ctx.moveTo(pad, pad-12);
@@ -714,49 +726,37 @@ function drawChart(){
   ctx.lineTo(pad+w+12, pad+h);
   ctx.stroke();
 
-  ctx.fillStyle='rgba(235,239,242,.78)';
-  ctx.textAlign='center';
-  ctx.textBaseline='middle';
-  ctx.fillText('Schritte', pad + w/2, pad+h + 40);
-  ctx.save();
-  ctx.translate(pad-44, pad + h/2);
-  ctx.rotate(-Math.PI/2);
-  ctx.fillText('Kumulierte Tendenz', 0, 0);
-  ctx.restore();
-
-  ctx.strokeStyle='rgba(160,170,180,0.5)';
+  ctx.strokeStyle='rgba(160,170,180,0.55)';
   ctx.lineWidth=2;
   ctx.beginPath();
-  ctx.moveTo(pad, midY);
-  ctx.lineTo(pad+w, midY);
+  ctx.moveTo(pad, valueToY(0));
+  ctx.lineTo(pad+w, valueToY(0));
   ctx.stroke();
 
-  const drawBand=(multiplier, fillStyle)=>{
+  if(stepsCount){
+    ctx.fillStyle='rgba(124,180,255,0.12)';
     ctx.beginPath();
-    ctx.moveTo(indexToX(0), valueToY(multiplier*Math.sqrt(0)));
-    for(let i=1;i<=chartSteps;i++){
-      ctx.lineTo(indexToX(i), valueToY(multiplier*Math.sqrt(i)));
-    }
-    for(let i=chartSteps;i>=0;i--){
-      ctx.lineTo(indexToX(i), valueToY(-multiplier*Math.sqrt(i)));
-    }
+    ctx.moveTo(indexToX(1), valueToY(bandValues[0]));
+    for(let i=2;i<=stepsCount;i++) ctx.lineTo(indexToX(i), valueToY(bandValues[i-1]));
+    ctx.lineTo(indexToX(stepsCount), valueToY(-bandValues[stepsCount-1]));
+    for(let i=stepsCount-1;i>=1;i--) ctx.lineTo(indexToX(i), valueToY(-bandValues[i-1]));
     ctx.closePath();
-    ctx.fillStyle=fillStyle;
     ctx.fill();
-  };
-  drawBand(1.96,'rgba(124,180,255,0.12)');
-  drawBand(1,'rgba(124,255,107,0.08)');
+  }
 
+  const exampleCurves=buildExampleCurves(Math.max(stepsCount, estimatePlannedSteps()));
   exampleCurves.forEach(curve=>{
+    legendItems.push({label:curve.label, type:'line', color:curve.color});
     const values=curve.values;
     ctx.save();
     ctx.globalAlpha=curve.alpha;
     ctx.strokeStyle=curve.color;
     ctx.lineWidth=curve.width;
     ctx.beginPath();
-    ctx.moveTo(indexToX(0), valueToY(values[0]||0));
     for(let i=1;i<values.length;i++){
-      ctx.lineTo(indexToX(i), valueToY(values[i]));
+      const x=indexToX(Math.min(i, stepsCount || estimatePlannedSteps()));
+      const y=valueToY(values[i]);
+      if(i===1) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
     ctx.stroke();
     ctx.restore();
@@ -766,52 +766,40 @@ function drawChart(){
     ctx.strokeStyle='rgba(124,255,107,0.9)';
     ctx.lineWidth=3;
     ctx.beginPath();
-    ctx.moveTo(indexToX(0), valueToY(0));
     for(let i=1;i<=stepsCount;i++){
-      ctx.lineTo(indexToX(i), valueToY(cumulative[i]));
+      const x=indexToX(i);
+      const y=valueToY(tendencyValues[i-1]);
+      if(i===1) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
     ctx.stroke();
 
     ctx.fillStyle='rgba(124,255,107,0.95)';
     const lastX=indexToX(stepsCount);
-    const lastY=valueToY(cumulative[cumulative.length-1]);
+    const lastY=valueToY(tendencyValues[stepsCount-1]);
     ctx.beginPath();
     ctx.arc(lastX,lastY,6,0,Math.PI*2);
     ctx.fill();
   }
-  const legendItems=[
-    {label:'Kumulierte Tendenz', type:'line', color:'rgba(124,255,107,0.9)'},
-    {label:'Null-Linie', type:'line', color:'rgba(160,170,180,0.55)'},
-    {label:'Zufallsband (Bias)', type:'fill', color:'rgba(124,180,255,0.28)'}
-  ];
-  if(showExampleCurves){
-    exampleCurves.forEach(curve=>{
-      legendItems.push({label:curve.label, type:'line', color:curve.color});
-    });
-  }
+
   renderLegend(legendItems);
 
-  chartHoverData={
-    points:[],
-    scaleX:scaleXFactor,
-    scaleY:scaleYFactor,
-    indexToX,
-    valueToY
-  };
+  const scaleXFactor=W/(chart.getBoundingClientRect().width||cssW);
+  const scaleYFactor=H/(chart.getBoundingClientRect().height||cssH);
+  chartHoverData={points:[], scaleX:scaleXFactor, scaleY:scaleYFactor, indexToX, valueToY};
   if(stepsCount){
-    for(let i=1;i<=stepsCount;i++){
-      chartHoverData.points.push({
-        x:indexToX(i),
-        y:valueToY(cumulative[i]),
-        idx:i,
-        value:cumulative[i],
-        dir:hist[i-1]===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'
-      });
-    }
+    chartHoverData.points=tendencyValues.map((value, idx)=>({
+      x:indexToX(idx+1),
+      y:valueToY(value),
+      idx:idx+1,
+      tendency:value,
+      rate:rateValues[idx],
+      band:bandValues[idx],
+      dir:hist[idx]===1?'Uhrzeigersinn':'Gegenuhrzeigersinn'
+    }));
   }else{
     chartHoverData.points=[];
   }
-  if(chartHoverHighlight){
+  if(chartHoverHighlight && chartHoverData.points.length){
     const match=chartHoverData.points.find(p=>p.idx===chartHoverHighlight.idx);
     if(match){
       ctx.strokeStyle='rgba(255,255,255,0.9)';
@@ -822,6 +810,7 @@ function drawChart(){
     }
   }
 }
+
 
 if(chartDetails){
   const mq=window.matchMedia('(max-width: 767px)');
@@ -901,7 +890,13 @@ function handleChartHover(evt){
     hideChartTooltip();
     return;
   }
-  chartTooltip.innerHTML=`<strong>Schritt ${refreshed.idx}</strong><br>Kumuliert: ${refreshed.value.toFixed(2)}<br>Richtung: ${refreshed.dir}<br><small>Bias misst die Abweichung von 50&nbsp;% unabhängig von der Richtung.</small>`;
+  const tendency=refreshed.tendency;
+  const rate=refreshed.rate*100;
+  const band=refreshed.band;
+  const tendencyStr=`${tendency>=0?'+':''}${tendency.toFixed(1)}%`;
+  const rateStr=`${rate.toFixed(1)}%`;
+  const bandStr=`±${band.toFixed(1)}%`;
+  chartTooltip.innerHTML=`<strong>Schritt ${refreshed.idx}</strong><br>Tendenzquote: ${tendencyStr}<br>Trefferquote kumuliert: ${rateStr}<br>Richtung: ${refreshed.dir}<br>95%-Band: ${bandStr}`;
   chartTooltip.style.left=`${clientX+16}px`;
   chartTooltip.style.top=`${clientY+16}px`;
   chartTooltip.classList.add('visible');
@@ -948,8 +943,19 @@ function showSummary(){
     targetTier=tierFromP(targetP);
   }
 
+  let tendencySigned=biasPct;
+  if(targetActive){
+    const signedDiff=(hits*2) - total;
+    const sign=signedDiff===0?0:(signedDiff>0?1:-1);
+    tendencySigned=sign*Math.abs(biasPct);
+  }else{
+    const sign=diff===0?0:(diff>0?1:-1);
+    tendencySigned=sign*Math.abs(biasPct);
+  }
+  const tendencyDisplay=(tendencySigned>=0?'+':'')+tendencySigned.toFixed(1);
+
   if(biasValueEl){
-    biasValueEl.textContent=biasPctDisplay+'%';
+    biasValueEl.textContent=tendencyDisplay+'%';
     biasValueEl.classList.toggle('mastermystic', biasTier.cls==='tier-extreme');
   }
   if(biasPValueEl) biasPValueEl.textContent=biasPDisplay;
@@ -975,7 +981,7 @@ function showSummary(){
   const lines=[
     'Zielvorgabe: <b>'+targetLabel+'</b>',
     'Schritte: <b>'+total+'</b> (Uhrz.: <b>'+cw+'</b>, Gegen: <b>'+ccw+'</b>)',
-    'Bias: <b>'+biasPctDisplay+'%</b> – p: <b>'+biasPDisplayHtml+'</b>'
+    'Tendenzquote: <b>'+tendencyDisplay+'%</b> – p: <b>'+biasPDisplayHtml+'</b>'
   ];
   if(targetActive){
     lines.push('Ziel-Trefferquote: <b>'+targetAcc.toFixed(1)+'%</b> – p: <b>'+targetPDisplayHtml+'</b>');
@@ -1020,7 +1026,7 @@ function currentSessionRecord(){
     ccw,
     hits:targetActive?hits:0,
     misses:targetActive?misses:0,
-    bias_pct:Number(biasPct.toFixed(2)),
+    bias_pct:Number(tendencySigned.toFixed(2)),
     z:biasZ,
     p:biasP,
     target_hit_rate:targetHitRate!==null?Number(targetHitRate.toFixed(4)):null,
@@ -1053,6 +1059,14 @@ function makeUploadPayload(endTs){
   const targetZ=targetActive? (diff*(focusDir||1))/denom : null;
   const targetP=targetZ!==null?Math.min(Math.max(pTwoTailFromZ(targetZ),0),1):null;
   const targetHitRate=targetActive?hits/totalSteps:null;
+  let tendencySigned=0;
+  if(targetActive){
+    const signedDiff=(hits*2) - totalSteps;
+    tendencySigned=totalSteps? (signedDiff/totalSteps)*100 : 0;
+  }else{
+    const sign=diff===0?0:(diff>0?1:-1);
+    tendencySigned=totalSteps? sign*(absDiff/totalSteps)*100 : 0;
+  }
   return {
     ts:safeEnd,
     duration_min:Number(Math.max(0, durationMinutes).toFixed(4)),
@@ -1064,7 +1078,7 @@ function makeUploadPayload(endTs){
     ccw,
     hits:targetActive?hits:0,
     misses:targetActive?misses:0,
-    bias_pct:Number((totalSteps? (absDiff/totalSteps*100):0).toFixed(4)),
+    bias_pct:Number(tendencySigned.toFixed(4)),
     z:safeBiasZ,
     p:safeBiasP,
     target_z:targetZ,
