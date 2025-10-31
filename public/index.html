@@ -323,6 +323,7 @@ const clearSessionsBtn = document.getElementById('clearSessions');
 const rootStyles=getComputedStyle(document.documentElement);
 const okStrokeColor=(rootStyles.getPropertyValue('--ok')||'#6dff65').trim()||'#6dff65';
 const projectOrange=(rootStyles.getPropertyValue('--infinity')||'#ff7a1a').trim()||'#ff7a1a';
+const exampleBlue='rgba(90,180,255,0.95)';
 
 const chartTooltip=document.createElement('div');
 chartTooltip.className='chart-tooltip';
@@ -602,7 +603,7 @@ function buildExampleCurves(totalSteps){
     setTargetMode('cw');
   }
   const defs=[
-    {rate:0.62,label:'Beispiel: starke Intention (~62 % Bias)', color:okStrokeColor, alpha:0.55, width:3, seed:19},
+    {rate:0.62,label:'Beispiel: starke Intention (~62 % Bias)', color:exampleBlue, alpha:0.6, width:3, seed:19},
     {rate:0.67,label:'Beispiel: sehr starke Intention (~67 % Bias)', color:projectOrange, alpha:0.7, width:3.6, seed:37}
   ];
   const slumpZones=[
@@ -712,7 +713,7 @@ function drawChart(){
   ctx.textBaseline='middle';
   ctx.fillText('Schritte', pad + w/2, pad+h + 40);
   ctx.save();
-  ctx.translate(pad-32, pad + h/2);
+  ctx.translate(pad-44, pad + h/2);
   ctx.rotate(-Math.PI/2);
   ctx.fillText('Tendenzquote (%)', 0, -18);
   ctx.font='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
