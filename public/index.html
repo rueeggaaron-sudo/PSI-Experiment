@@ -88,9 +88,9 @@
 
   .chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;color:var(--muted);font-size:13px;align-items:center}
   .legend-item{display:flex;align-items:center;gap:6px;white-space:nowrap}
-  .legend-swatch{width:28px;height:6px;border-radius:4px;display:inline-block;background:rgba(255,255,255,0.6)}
-  .legend-swatch.line{height:4px}
-  .legend-swatch.fill{height:12px;opacity:0.45}
+  .legend-swatch{width:28px;display:inline-block;flex-shrink:0;border-radius:999px;border:1px solid transparent}
+  .legend-swatch.line{height:4px;background:currentColor;box-shadow:0 0 0 1px rgba(12,18,22,0.4)}
+  .legend-swatch.fill{height:12px}
 
   .summary-note{display:block;font-size:13px;color:var(--muted);margin-top:6px}
   .result-wrap{max-width:980px;margin:0 auto;padding:0 16px}
@@ -323,6 +323,7 @@ const clearSessionsBtn = document.getElementById('clearSessions');
 const rootStyles=getComputedStyle(document.documentElement);
 const okStrokeColor=(rootStyles.getPropertyValue('--ok')||'#6dff65').trim()||'#6dff65';
 const projectOrange=(rootStyles.getPropertyValue('--infinity')||'#ff7a1a').trim()||'#ff7a1a';
+const exampleBlue='rgba(90,180,255,0.95)';
 
 const chartTooltip=document.createElement('div');
 chartTooltip.className='chart-tooltip';
@@ -401,7 +402,9 @@ function renderLegend(items){
   if(!chartLegend) return;
   chartLegend.innerHTML = items.map(item=>{
     const typeClass = item.type==='fill' ? 'legend-swatch fill' : 'legend-swatch line';
-    const style = `style="background:${item.type==='fill'?item.color: item.color};"`;
+    const style = item.type==='fill'
+      ? `style="background:${item.color};border-color:${item.stroke || item.color};"`
+      : `style="color:${item.color};"`;
     return `<span class="legend-item"><span class="${typeClass}" ${style}></span><span>${item.label}</span></span>`;
   }).join('');
 }
@@ -600,7 +603,7 @@ function buildExampleCurves(totalSteps){
     setTargetMode('cw');
   }
   const defs=[
-    {rate:0.62,label:'Beispiel: starke Intention (~62 % Bias)', color:okStrokeColor, alpha:0.55, width:3, seed:19},
+    {rate:0.62,label:'Beispiel: starke Intention (~62 % Bias)', color:exampleBlue, alpha:0.6, width:3, seed:19},
     {rate:0.67,label:'Beispiel: sehr starke Intention (~67 % Bias)', color:projectOrange, alpha:0.7, width:3.6, seed:37}
   ];
   const slumpZones=[
@@ -642,7 +645,7 @@ function drawChart(){
   const baseLegend=[
     {label:'Tendenzquote (laufend)', type:'line', color:'rgba(124,255,107,0.9)'},
     {label:'Null-Linie (50 %)', type:'line', color:'rgba(160,170,180,0.55)'},
-    {label:'Zufallsband (95 %)', type:'fill', color:'rgba(124,180,255,0.28)'}
+    {label:'Zufallsband (95 %)', type:'fill', color:'rgba(124,180,255,0.28)', stroke:'rgba(124,180,255,0.6)'}
   ];
   if(chartDetails && !chartDetails.open){
     renderLegend(baseLegend);
@@ -710,10 +713,13 @@ function drawChart(){
   ctx.textBaseline='middle';
   ctx.fillText('Schritte', pad + w/2, pad+h + 40);
   ctx.save();
-  ctx.translate(pad-60, pad + h/2);
+  ctx.translate(pad-44, pad + h/2);
   ctx.rotate(-Math.PI/2);
-  ctx.fillText('Tendenzquote (%) (vs. 50 %)', 0, 0);
+  ctx.fillText('Tendenzquote (%)', 0, -18);
+  ctx.font='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+  ctx.fillText('vs. 50 %', 0, 20);
   ctx.restore();
+  ctx.font='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
 
   ctx.strokeStyle='rgba(200,205,210,0.45)';
   ctx.lineWidth=2;
