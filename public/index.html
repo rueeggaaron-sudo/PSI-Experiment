@@ -712,12 +712,62 @@ function drawChart(){
   ctx.textAlign='center';
   ctx.textBaseline='middle';
   ctx.fillText('Schritte', pad + w/2, pad+h + 40);
+  const primaryYAxisLabel='Tendenzquote (%)';
+  const secondaryYAxisLabel='vs. 50 %';
+  const yAxisPrimaryFont='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+  const yAxisSecondaryFont='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+  const yAxisCanvasMargin=12;
+  const yAxisPlotClearance=10;
+  const yAxisLineSpacing=32;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  const yAxisAnchorY=pad + h/2;
+  const labelConfigs=[
+    {text:primaryYAxisLabel, font:yAxisPrimaryFont},
+    {text:secondaryYAxisLabel, font:yAxisSecondaryFont}
+  ];
+  const labelMetrics=labelConfigs.map(({text,font})=>{
+    ctx.font=font;
+    const metrics=ctx.measureText(text);
+    const ascent=metrics.actualBoundingBoxAscent ?? 0;
+    const descent=metrics.actualBoundingBoxDescent ?? 0;
+    let height=ascent + descent;
+    if(!height){
+      const parsed=parseInt(font, 10);
+      height=Number.isFinite(parsed)?parsed:28;
+    }
+    return {
+      text,
+      font,
+      width:metrics.width,
+      height
+    };
+  });
+  const maxHalfHeight=labelMetrics.reduce((max,metric)=>Math.max(max, metric.height/2), 0);
+  const minCenterX=yAxisCanvasMargin + maxHalfHeight;
+  const maxCenterX=pad - yAxisPlotClearance - maxHalfHeight;
+  const desiredCenterX=pad - 44;
+  const yAxisAnchorX=Math.min(Math.max(desiredCenterX, minCenterX), maxCenterX);
+  const totalBaselineExtent=labelMetrics.reduce((total,metric,idx)=>{
+    return total + metric.width + (idx>0?yAxisLineSpacing:0);
+  },0);
+  let currentBaseline=-totalBaselineExtent/2;
+  const baselineOffsets=labelMetrics.map((metric,idx)=>{
+    currentBaseline+=metric.width/2;
+    const offset=currentBaseline;
+    currentBaseline+=metric.width/2;
+    if(idx<labelMetrics.length-1){
+      currentBaseline+=yAxisLineSpacing;
+    }
+    return offset;
+  });
   ctx.save();
-  ctx.translate(pad-44, pad + h/2);
+  ctx.translate(yAxisAnchorX, yAxisAnchorY);
   ctx.rotate(-Math.PI/2);
-  ctx.fillText('Tendenzquote (%)', 0, -18);
-  ctx.font='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
-  ctx.fillText('vs. 50 %', 0, 20);
+  labelMetrics.forEach((metric,idx)=>{
+    ctx.font=metric.font;
+    ctx.fillText(metric.text, baselineOffsets[idx], 0);
+  });
   ctx.restore();
   ctx.font='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
 
