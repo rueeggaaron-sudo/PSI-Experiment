@@ -7,8 +7,13 @@ export const runtime = 'nodejs';
  * Erwartetes JSON (Whitelist):
  * { uid?, ts, duration_min, speed_ms, start_field, focus, steps, cw, ccw, hits, misses, z, p }
  */
-const ALLOWED = new Set(['uid','ts','duration_min','speed_ms','start_field','focus','steps','cw','ccw','hits','misses','z','p']);
+const ALLOWED = new Set([
+  'uid','ts','duration_min','speed_ms','start_field','focus','steps','cw','ccw','hits','misses','z','p',
+  'experiment_key','experiment_version','bias_pct','target_z','target_p','hit_rate'
+]);
 const NUMERIC_FIELDS = ['ts','duration_min','speed_ms','start_field','steps','cw','ccw','hits','misses','z','p'];
+const OPTIONAL_NUMERIC_FIELDS = ['bias_pct','target_z','target_p','hit_rate'];
+const EXPERIMENT_KEY_RE = /^[a-z0-9-]{1,64}$/i;
 const UID_RE = /^[a-z0-9]{12,64}$/;
 
 const isNumber = value => typeof value === 'number' && Number.isFinite(value);
@@ -50,12 +55,19 @@ export default async function handler(req) {
     return new Response('Bad Request', { status: 400 });
   }
 
-  if (rec.focus !== 'cw' && rec.focus !== 'ccw') {
+  if (rec.focus !== 'cw' && rec.focus !== 'ccw' && rec.focus !== 'none') {
     return new Response('Bad Request', { status: 400 });
   }
 
   if (!Number.isInteger(rec.start_field) || rec.start_field < 1) {
     return new Response('Bad Request', { status: 400 });
+  }
+
+  for (const field of OPTIONAL_NUMERIC_FIELDS) {
+    if (rec[field] === undefined || rec[field] === null) continue;
+    if (!isNumber(rec[field])) {
+      return new Response('Bad Request', { status: 400 });
+    }
   }
 
   let uid = rec.uid;
@@ -76,6 +88,8 @@ export default async function handler(req) {
 
   const storedRecord = {
     ...(uid !== 'anon' ? { uid } : {}),
+    ...(typeof rec.experiment_key === 'string' && EXPERIMENT_KEY_RE.test(rec.experiment_key) ? { experiment_key: rec.experiment_key } : {}),
+    ...(typeof rec.experiment_version === 'string' && rec.experiment_version.trim() ? { experiment_version: rec.experiment_version.trim() } : {}),
     ts,
     duration_min: Number(rec.duration_min),
     speed_ms: Number(rec.speed_ms),
@@ -88,6 +102,10 @@ export default async function handler(req) {
     misses: Number(rec.misses),
     z: Number(rec.z),
     p: Number(rec.p),
+    ...(rec.bias_pct !== undefined && rec.bias_pct !== null ? { bias_pct: Number(rec.bias_pct) } : {}),
+    ...(rec.target_z !== undefined && rec.target_z !== null ? { target_z: Number(rec.target_z) } : {}),
+    ...(rec.target_p !== undefined && rec.target_p !== null ? { target_p: Number(rec.target_p) } : {}),
+    ...(rec.hit_rate !== undefined && rec.hit_rate !== null ? { hit_rate: Number(rec.hit_rate) } : {}),
   };
 
   const keyUid = uid === 'anon' ? 'anon' : uid;

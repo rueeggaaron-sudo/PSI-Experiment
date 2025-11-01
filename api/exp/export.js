@@ -4,8 +4,12 @@ export const runtime = 'nodejs';
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UID_RE = /^[a-z0-9]{12,64}$/;
-const CSV_FIELDS = ['uid','ts','duration_min','speed_ms','start_field','focus','steps','cw','ccw','hits','misses','z','p'];
+const CSV_FIELDS = [
+  'experiment_key','experiment_version','uid','ts','duration_min','speed_ms','start_field','focus','steps','cw','ccw','hits','misses','z','p','bias_pct','target_z','target_p','hit_rate'
+];
 const NUMERIC_FIELDS = ['ts','duration_min','speed_ms','start_field','steps','cw','ccw','hits','misses','z','p'];
+const OPTIONAL_NUMERIC_FIELDS = ['bias_pct','target_z','target_p','hit_rate'];
+const EXPERIMENT_KEY_RE = /^[a-z0-9-]{1,64}$/i;
 
 const isNumber = value => typeof value === 'number' && Number.isFinite(value);
 
@@ -29,7 +33,7 @@ const sanitizeRecord = (raw, fallbackUid) => {
   }
 
   const focus = raw.focus;
-  if (focus !== 'cw' && focus !== 'ccw') {
+  if (focus !== 'cw' && focus !== 'ccw' && focus !== 'none') {
     throw new Error('Invalid record');
   }
 
@@ -42,11 +46,21 @@ const sanitizeRecord = (raw, fallbackUid) => {
     throw new Error('Invalid record');
   }
 
+  for (const field of OPTIONAL_NUMERIC_FIELDS) {
+    const value = raw[field];
+    if (value === undefined || value === null) continue;
+    if (!isNumber(value)) {
+      throw new Error('Invalid record');
+    }
+  }
+
   if (!Number.isInteger(numbers.start_field) || numbers.start_field < 1) {
     throw new Error('Invalid record');
   }
 
   const record = {
+    ...(typeof raw.experiment_key === 'string' && EXPERIMENT_KEY_RE.test(raw.experiment_key) ? { experiment_key: raw.experiment_key } : {}),
+    ...(typeof raw.experiment_version === 'string' && raw.experiment_version.trim() ? { experiment_version: raw.experiment_version.trim() } : {}),
     ts: Math.round(numbers.ts),
     duration_min: numbers.duration_min,
     speed_ms: numbers.speed_ms,
@@ -59,6 +73,10 @@ const sanitizeRecord = (raw, fallbackUid) => {
     misses: numbers.misses,
     z: numbers.z,
     p: numbers.p,
+    ...(raw.bias_pct !== undefined && raw.bias_pct !== null ? { bias_pct: Number(raw.bias_pct) } : {}),
+    ...(raw.target_z !== undefined && raw.target_z !== null ? { target_z: Number(raw.target_z) } : {}),
+    ...(raw.target_p !== undefined && raw.target_p !== null ? { target_p: Number(raw.target_p) } : {}),
+    ...(raw.hit_rate !== undefined && raw.hit_rate !== null ? { hit_rate: Number(raw.hit_rate) } : {}),
   };
 
   const explicitUid = typeof raw.uid === 'string' ? raw.uid.toLowerCase() : undefined;
@@ -73,6 +91,8 @@ const sanitizeRecord = (raw, fallbackUid) => {
 
 const toJsonObject = record => {
   const base = {
+    ...(record.experiment_key ? { experiment_key: record.experiment_key } : {}),
+    ...(record.experiment_version ? { experiment_version: record.experiment_version } : {}),
     ts: record.ts,
     duration_min: record.duration_min,
     speed_ms: record.speed_ms,
@@ -85,6 +105,10 @@ const toJsonObject = record => {
     misses: record.misses,
     z: record.z,
     p: record.p,
+    ...(record.bias_pct !== undefined ? { bias_pct: record.bias_pct } : {}),
+    ...(record.target_z !== undefined ? { target_z: record.target_z } : {}),
+    ...(record.target_p !== undefined ? { target_p: record.target_p } : {}),
+    ...(record.hit_rate !== undefined ? { hit_rate: record.hit_rate } : {}),
   };
   return record.uid ? { uid: record.uid, ...base } : base;
 };
@@ -93,6 +117,12 @@ const formatCsv = records => {
   const header = CSV_FIELDS.join(',');
   const lines = records.map(record => {
     return CSV_FIELDS.map(field => {
+      if (field === 'experiment_key') {
+        return csvEscape(record.experiment_key ?? '');
+      }
+      if (field === 'experiment_version') {
+        return csvEscape(record.experiment_version ?? '');
+      }
       if (field === 'uid') {
         return csvEscape(record.uid ?? '');
       }
