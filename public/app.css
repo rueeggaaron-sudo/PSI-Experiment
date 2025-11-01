@@ -27,6 +27,191 @@ body {
   font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
 
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--sep);
+}
+
+.app-nav__spacer {
+  flex: 1 1 auto;
+}
+
+.app-nav__link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 999px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.app-nav__link:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-nav__link--secondary {
+  color: var(--muted);
+}
+
+.app-nav__link--active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.app-nav__button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 16px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.app-nav__button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.app-nav__button.secondary {
+  color: var(--muted);
+}
+
+.app-nav__button[data-state='granted'] {
+  border-color: rgba(109, 255, 101, 0.4);
+  background: rgba(109, 255, 101, 0.2);
+  color: var(--text);
+}
+
+.app-nav__button[data-state='denied'] {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.toast-root {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.toast {
+  min-width: 240px;
+  max-width: 320px;
+  background: rgba(22, 28, 32, 0.95);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  border-left: 4px solid rgba(255, 255, 255, 0.18);
+  color: #f5f6f8;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: auto;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast[data-variant='success'] {
+  border-left-color: var(--ok);
+}
+
+.toast[data-variant='error'] {
+  border-left-color: var(--bad);
+}
+
+.toast__message {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.toast__description {
+  font-size: 14px;
+  color: rgba(229, 236, 239, 0.8);
+}
+
+.consent-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 12, 0.84);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+}
+
+.consent-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.consent-dialog {
+  background: #10161c;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.consent-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+.consent-dialog p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.consent-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.consent-btn {
+  flex: 1 1 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 10px 16px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.consent-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.consent-btn.primary {
+  border-color: rgba(109, 255, 101, 0.5);
+  background: rgba(109, 255, 101, 0.2);
+}
+
+.consent-note {
+  font-size: 14px;
+  color: rgba(233, 239, 242, 0.7);
+  margin-top: 6px;
+}
+
 /* EDIT: MYSTIC BACKDROP (dezent, kann entfernt werden) */
 body.bg-stars::before {
   content: "";
