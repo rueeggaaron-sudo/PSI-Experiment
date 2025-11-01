@@ -716,50 +716,58 @@ function drawChart(){
   const secondaryYAxisLabel='vs. 50 %';
   const yAxisPrimaryFont='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
   const yAxisSecondaryFont='24px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
-  const yAxisAxisMargin=24;
   const yAxisCanvasMargin=12;
-  const yAxisLineGap=36;
-  const yAxisClearance=12;
+  const yAxisPlotClearance=10;
+  const yAxisLineSpacing=32;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  ctx.font=yAxisPrimaryFont;
-  const primaryYAxisWidth=ctx.measureText(primaryYAxisLabel).width;
-  ctx.font=yAxisSecondaryFont;
-  const secondaryYAxisWidth=ctx.measureText(secondaryYAxisLabel).width;
-  const maxYAxisWidth=Math.max(primaryYAxisWidth, secondaryYAxisWidth);
-  let yAxisAnchorX=pad;
   const yAxisAnchorY=pad + h/2;
-  const baseYAxisOffset=yAxisAxisMargin + yAxisClearance + (maxYAxisWidth/2) + (yAxisLineGap/2);
-  const primaryYAxisOffset=-(baseYAxisOffset - yAxisLineGap/2);
-  const secondaryYAxisOffset=-(baseYAxisOffset + yAxisLineGap/2);
-  const yAxisLabelMetrics=[
-    {offset:primaryYAxisOffset, width:primaryYAxisWidth},
-    {offset:secondaryYAxisOffset, width:secondaryYAxisWidth}
+  const labelConfigs=[
+    {text:primaryYAxisLabel, font:yAxisPrimaryFont},
+    {text:secondaryYAxisLabel, font:yAxisSecondaryFont}
   ];
-  let yAxisMinLeft=Infinity;
-  let yAxisMaxRight=-Infinity;
-  yAxisLabelMetrics.forEach(({offset,width})=>{
-    const centerX=yAxisAnchorX + offset;
-    const leftEdge=centerX - width/2;
-    const rightEdge=centerX + width/2;
-    if(leftEdge<yAxisMinLeft) yAxisMinLeft=leftEdge;
-    if(rightEdge>yAxisMaxRight) yAxisMaxRight=rightEdge;
-  });
-  const desiredYAxisShift=yAxisCanvasMargin - yAxisMinLeft;
-  if(desiredYAxisShift>0){
-    const maxYAxisShift=(pad - yAxisAxisMargin) - yAxisMaxRight;
-    const effectiveShift=Math.max(0, Math.min(desiredYAxisShift, yAxisClearance, maxYAxisShift));
-    if(effectiveShift>0){
-      yAxisAnchorX+=effectiveShift;
+  const labelMetrics=labelConfigs.map(({text,font})=>{
+    ctx.font=font;
+    const metrics=ctx.measureText(text);
+    const ascent=metrics.actualBoundingBoxAscent ?? 0;
+    const descent=metrics.actualBoundingBoxDescent ?? 0;
+    let height=ascent + descent;
+    if(!height){
+      const parsed=parseInt(font, 10);
+      height=Number.isFinite(parsed)?parsed:28;
     }
-  }
+    return {
+      text,
+      font,
+      width:metrics.width,
+      height
+    };
+  });
+  const maxHalfHeight=labelMetrics.reduce((max,metric)=>Math.max(max, metric.height/2), 0);
+  const minCenterX=yAxisCanvasMargin + maxHalfHeight;
+  const maxCenterX=pad - yAxisPlotClearance - maxHalfHeight;
+  const desiredCenterX=pad - 44;
+  const yAxisAnchorX=Math.min(Math.max(desiredCenterX, minCenterX), maxCenterX);
+  const totalBaselineExtent=labelMetrics.reduce((total,metric,idx)=>{
+    return total + metric.width + (idx>0?yAxisLineSpacing:0);
+  },0);
+  let currentBaseline=-totalBaselineExtent/2;
+  const baselineOffsets=labelMetrics.map((metric,idx)=>{
+    currentBaseline+=metric.width/2;
+    const offset=currentBaseline;
+    currentBaseline+=metric.width/2;
+    if(idx<labelMetrics.length-1){
+      currentBaseline+=yAxisLineSpacing;
+    }
+    return offset;
+  });
   ctx.save();
   ctx.translate(yAxisAnchorX, yAxisAnchorY);
   ctx.rotate(-Math.PI/2);
-  ctx.font=yAxisPrimaryFont;
-  ctx.fillText(primaryYAxisLabel, 0, primaryYAxisOffset);
-  ctx.font=yAxisSecondaryFont;
-  ctx.fillText(secondaryYAxisLabel, 0, secondaryYAxisOffset);
+  labelMetrics.forEach((metric,idx)=>{
+    ctx.font=metric.font;
+    ctx.fillText(metric.text, baselineOffsets[idx], 0);
+  });
   ctx.restore();
   ctx.font='28px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
 
