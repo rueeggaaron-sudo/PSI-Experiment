@@ -213,6 +213,10 @@ body.bg-stars::after {
   z-index: 999;
 }
 
+.consent-overlay[hidden] {
+  display: none !important;
+}
+
 .consent-dialog {
   background: rgba(11, 15, 16, 0.96);
   border: 1px solid var(--app-border);
