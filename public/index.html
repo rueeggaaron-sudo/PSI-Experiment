@@ -16,9 +16,7 @@
     <div class="app-header-inner">
       <h1 class="app-title">PSI Experimente</h1>
       <nav id="experiment-nav" class="app-nav" aria-label="Experimente"></nav>
-      <div class="app-consent">
-        <button id="consent-toggle" type="button">Upload-Erlaubnis</button>
-      </div>
+      <p class="app-upload-note">Upload-Hinweis: Sessions werden anonym (UID, keine PII) auf Vercel Blob gespeichert, um Fortschritt nachvollziehen zu können.</p>
     </div>
   </header>
   <main id="app-main" class="app-main" tabindex="-1" aria-live="polite" aria-busy="false">
@@ -30,19 +28,6 @@
       <a href="/privacy.html">Datenschutz</a>
     </div>
   </footer>
-
-  <div id="consent-overlay" class="consent-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="consent-title">
-    <div class="consent-dialog">
-      <h2 id="consent-title">Upload-Erlaubnis</h2>
-      <p id="consent-status">Daten werden nur mit deiner Zustimmung übermittelt. Ohne Freigabe bleiben alle Sessions lokal.</p>
-      <p>Die Einwilligung kann jederzeit widerrufen werden. Uploads erfolgen anonym, enthalten nur Experimentdaten und werden auf Vercel Blob gespeichert.</p>
-      <div class="consent-actions">
-        <button type="button" class="secondary" id="consent-cancel">Schließen</button>
-        <button type="button" class="secondary" id="consent-revoke">Einwilligung widerrufen</button>
-        <button type="button" id="consent-accept">Upload erlauben</button>
-      </div>
-    </div>
-  </div>
 
   <script type="module" src="/app.js"></script>
   <script src="/uid.js"></script>

@@ -1,12 +1,14 @@
 const ensurePlainObject = value => (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
 
-export const initSubmitHandler = ({ getConsent }) => {
-  const consentGetter = typeof getConsent === 'function'
-    ? getConsent
-    : (() => false);
+export const initSubmitHandler = ({ allowSubmit, getConsent } = {}) => {
+  const shouldSubmit = typeof allowSubmit === 'function'
+    ? allowSubmit
+    : typeof getConsent === 'function'
+      ? () => !!getConsent()
+      : () => true;
 
   async function submitExperimentData(record) {
-    if (!consentGetter()) {
+    if (!shouldSubmit(record)) {
       return;
     }
     const payload = { ...ensurePlainObject(record) };

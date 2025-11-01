@@ -127,29 +127,13 @@ body.bg-stars::after {
   color: var(--nav-active);
 }
 
-.app-consent {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.app-consent button {
-  border-radius: 12px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--app-border);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.app-consent button:hover,
-.app-consent button:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
-  outline: none;
-  box-shadow: var(--focus-ring);
+.app-upload-note {
+  margin: 0 0 0 auto;
+  max-width: 320px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--app-muted);
+  text-align: right;
 }
 
 .app-main {
@@ -202,72 +186,13 @@ body.bg-stars::after {
   font-size: 15px;
 }
 
-.consent-overlay {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(10px);
-  z-index: 999;
-}
-
-.consent-overlay[hidden] {
-  display: none !important;
-}
-
-.consent-dialog {
-  background: rgba(11, 15, 16, 0.96);
-  border: 1px solid var(--app-border);
-  border-radius: 18px;
-  padding: 24px;
-  max-width: 520px;
-  color: var(--app-text);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
-}
-
-.consent-dialog h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.consent-dialog p {
-  margin: 0;
-  color: var(--app-muted);
-  font-size: 15px;
-}
-
-.consent-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.consent-actions button {
-  border-radius: 12px;
-  padding: 8px 14px;
-  font: inherit;
-  cursor: pointer;
-  border: 1px solid var(--app-border);
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
-  transition: background 0.2s ease;
-}
-
-.consent-actions button:hover,
-.consent-actions button:focus-visible {
-  background: rgba(255, 255, 255, 0.16);
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.consent-actions button.secondary {
-  background: transparent;
+@media (max-width: 860px) {
+  .app-upload-note {
+    margin-left: 0;
+    max-width: none;
+    text-align: left;
+    flex-basis: 100%;
+  }
 }
 
 @media (max-width: 640px) {
@@ -281,8 +206,8 @@ body.bg-stars::after {
     margin-left: 0;
   }
 
-  .app-consent {
+  .app-upload-note {
     width: 100%;
-    justify-content: center;
+    text-align: center;
   }
 }
