@@ -1070,6 +1070,14 @@ function currentSessionRecord(){
   const targetHitRate=targetActive && total ? hits/total : null;
   const targetZ=targetActive ? (diff*(focusDir||1))/denom : null;
   const targetP=targetActive && targetZ!==null ? pTwoTailFromZ(targetZ) : null;
+  let tendencySigned=0;
+  if(targetActive){
+    const signedDiff=(hits*2) - total;
+    tendencySigned=total ? (signedDiff/total)*100 : 0;
+  }else{
+    const sign=diff===0?0:(diff>0?1:-1);
+    tendencySigned=total ? sign*(absDiff/total)*100 : 0;
+  }
   return {
     time:new Date().toISOString(),
     duration,
