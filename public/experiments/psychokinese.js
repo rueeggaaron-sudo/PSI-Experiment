@@ -1270,7 +1270,7 @@ let styleInjected = false;
 function ensureStyles() {
   if (styleInjected) return;
   const style = document.createElement('style');
-  style.dataset.experimentStyle = 'psychokinesis';
+  style.dataset.experimentStyle = 'psychokinese';
   style.textContent = styles;
   document.head.appendChild(style);
   styleInjected = true;
