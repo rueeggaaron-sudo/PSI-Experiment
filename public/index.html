@@ -17,22 +17,6 @@
   <div id="consent-modal"></div>
   <div id="toast-root"></div>
   <script src="/uid.js" defer></script>
-  <script type="module">
-    import { mountPsychokinesis } from '/experiments/psychokinesis.js';
-
-    const mount = () => {
-      try {
-        mountPsychokinesis();
-      } catch (error) {
-        console.error('Failed to mount psychokinesis experiment', error);
-      }
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', mount, { once: true });
-    } else {
-      mount();
-    }
-  </script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
