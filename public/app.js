@@ -6,7 +6,7 @@ const experiments = [
     title: 'Psychokinese',
     path: '/psychokinese',
     version: '2024.10',
-    loader: () => import('./experiments/psychokinese.js'),
+    loader: () => import('./experiments/psychokinesis.js'),
   },
   {
     key: 'remote-viewing',
