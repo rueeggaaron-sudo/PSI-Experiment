@@ -1,4 +1,5 @@
 import { mountPsychokinesis, unmountPsychokinesis } from './experiments/psychokinesis.js';
+import { mountPrecognition, unmountPrecognition } from './experiments/precognition.js';
 import { initializeConsent } from './helpers/consent.js';
 import { initializeToasts, triggerDataExport } from './helpers/data.js';
 
@@ -7,6 +8,11 @@ const ROUTES = {
     label: 'Psychokinese',
     mount: mountPsychokinesis,
     unmount: unmountPsychokinesis,
+  },
+  precognition: {
+    label: 'Präkognition',
+    mount: mountPrecognition,
+    unmount: unmountPrecognition,
   },
 };
 
@@ -36,9 +42,15 @@ let activeRoute = null;
 
 function renderNav() {
   if (!navRoot) return;
+  const links = Object.entries(ROUTES)
+    .map(([slug, route]) => {
+      const label = route && route.label ? route.label : slug;
+      return `<a class="app-nav__link" href="#/${slug}" data-route="${slug}">${label}</a>`;
+    })
+    .join('\n      ');
   navRoot.innerHTML = `
     <nav class="app-nav" aria-label="Navigation">
-      <a class="app-nav__link" href="#/psychokinesis" data-route="psychokinesis">Psychokinese</a>
+      ${links}
       <span class="app-nav__spacer"></span>
       <button type="button" class="app-nav__button" data-action="consent"></button>
       <button type="button" class="app-nav__button secondary" data-action="export">Export</button>
