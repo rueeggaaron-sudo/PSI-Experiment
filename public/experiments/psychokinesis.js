@@ -1,3 +1,5 @@
+import { installSubmitExperimentData } from '../helpers/submit.js';
+
 // Legacy Psychokinesis experiment markup and logic.
 const template = `<main>
   <!-- EDIT: TEXTE (Landing & Einleitung) -->
@@ -134,42 +136,6 @@ const template = `<main>
   <a href="/privacy.html" style="color:inherit;text-decoration:underline;">Datenschutz</a>
 </footer>
 `;
-
-function installSubmitExperimentData() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  const existing = window.submitExperimentData;
-  if (typeof existing === 'function' && existing.__psiProvided) {
-    return;
-  }
-  const submitExperimentData = async function(rec){
-    let consent=false;
-    try{
-      const raw=typeof localStorage!=='undefined'?localStorage.getItem('exp-upload-ok'):null;
-      consent=raw?JSON.parse(raw):false;
-    }catch(e){
-      try{
-        const raw=typeof sessionStorage!=='undefined'?sessionStorage.getItem('exp-upload-ok'):null;
-        consent=raw?JSON.parse(raw):false;
-      }catch(err){ consent=false; }
-    }
-    if(!consent) return;
-    const payload=(rec && typeof rec==='object')?{...rec}:{};
-    const tsValue=payload.ts;
-    payload.ts=(typeof tsValue==='number' && Number.isFinite(tsValue))?Math.round(tsValue):Date.now();
-    try{
-      await fetch('/api/exp/submit', {
-        method:'POST',
-        headers:{'content-type':'application/json'},
-        body: JSON.stringify(payload),
-        keepalive:true
-      });
-    }catch(e){ console.warn('Experiment upload failed', e); }
-  };
-  submitExperimentData.__psiProvided = true;
-  window.submitExperimentData = submitExperimentData;
-}
 
 function initPsychokinesisExperiment() {
   // EDIT: CONFIG (Konstanten anpassen)

@@ -11,9 +11,13 @@ PRs: Feature → `dev`, Release via PR `dev → main` (Checks/Build grün).
 - Siehe `public/privacy.html` und `CONSENT.md`.
 
 ## Ergebnisse (UI)
-- Trefferquote + **p-Badge** (Stufen von „Zufall“ bis „extrem stark“).  
-- Diagramm optional (Achsen, Null-Linie, Zufallsbänder, Tooltip).  
+- Trefferquote + **p-Badge** (Stufen von „Zufall“ bis „extrem stark“).
+- Diagramm optional (Achsen, Null-Linie, Zufallsbänder, Tooltip).
 - Session-Tabelle mit horizontalem Scroll für schmale Bildschirme.
+
+## Experimente
+- `#/psychokinesis` – klassisches RNG-Rad (16 Felder) mit Lauf-Visualisierung und Session-Export.
+- `#/precognition` – Sequenz fokussierter Vorhersagen (Sonne/Mond) inklusive Binomialauswertung und JSON-Download.
 
 ## Export
 - Endpoint: `/api/exp/export?day=YYYY-MM-DD&format=csv|jsonl`  
