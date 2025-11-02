@@ -3,8 +3,14 @@ export function installSubmitExperimentData() {
     return;
   }
   const existing = window.submitExperimentData;
-  if (typeof existing === 'function' && existing.__psiProvided) {
-    return;
+  if (typeof existing === 'function') {
+    if (existing.__psiProvided) {
+      return;
+    }
+    if (existing.__uidWrapped) {
+      existing.__psiProvided = true;
+      return;
+    }
   }
   const submitExperimentData = async function (rec) {
     let consent = false;
