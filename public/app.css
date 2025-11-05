@@ -789,16 +789,21 @@ canvas {
 .itk-fieldset {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   display: flex;
   gap: 12px;
   align-items: center;
+  background: linear-gradient(135deg, rgba(18, 28, 38, 0.72), rgba(12, 18, 26, 0.88));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
 }
 
 .itk-fieldset legend {
   padding: 0 6px;
   font-size: 14px;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.76);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .itk-fieldset label {
@@ -812,7 +817,20 @@ canvas {
   display: flex;
   gap: 14px;
   font-size: 15px;
-  color: var(--muted);
+  color: rgba(222, 230, 238, 0.92);
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(14, 24, 32, 0.78), rgba(10, 16, 24, 0.88));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.itk-status span {
+  min-width: 11ch;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .itk-button {
