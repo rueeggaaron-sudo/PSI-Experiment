@@ -81,6 +81,7 @@ export function mountDetector(root) {
   let stream = null;
   let rafId = null;
   let running = false;
+  let pendingStartToken = null;
   let baseline = null;
   let baselineReady = false;
   let sparklineHistory = [];
@@ -376,12 +377,15 @@ export function mountDetector(root) {
   };
 
   const start = async () => {
-    if (running) return;
+    if (running || pendingStartToken) return;
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
       setError('getUserMedia wird nicht unterstützt.');
       return;
     }
     setError('');
+    const startToken = {};
+    pendingStartToken = startToken;
+    startBtn.disabled = true;
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -390,6 +394,17 @@ export function mountDetector(root) {
         },
         audio: false,
       });
+      if (pendingStartToken !== startToken) {
+        mediaStream.getTracks().forEach(track => {
+          try {
+            track.stop();
+          } catch (error) {
+            // ignore
+          }
+        });
+        return;
+      }
+      pendingStartToken = null;
       stream = mediaStream;
       videoEl.srcObject = stream;
       baselineReady = false;
@@ -402,12 +417,16 @@ export function mountDetector(root) {
       videoEl.play().catch(() => {});
       step();
     } catch (error) {
+      if (pendingStartToken === startToken) {
+        pendingStartToken = null;
+      }
       setError('Kamera konnte nicht gestartet werden. Bitte Berechtigungen prüfen.');
       stop();
     }
   };
 
   const stop = () => {
+    pendingStartToken = null;
     running = false;
     clearAnimation();
     stopStreamTracks();
