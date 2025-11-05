@@ -1,6 +1,7 @@
 import { mountPsychokinesis, unmountPsychokinesis } from './experiments/psychokinesis.js';
 import { mountPrecognition, unmountPrecognition } from './experiments/precognition.js';
 import { mountItk, unmountItk } from './experiments/itk.js';
+import { mountDetector, unmountDetector } from './experiments/detector.js';
 import { initializeConsent } from './helpers/consent.js';
 import { initializeToasts, triggerDataExport } from './helpers/data.js';
 
@@ -19,6 +20,11 @@ const ROUTES = {
     label: 'Transkommunikation',
     mount: mountItk,
     unmount: unmountItk,
+  },
+  detector: {
+    label: 'Anomaly Detector',
+    mount: mountDetector,
+    unmount: unmountDetector,
   },
 };
 

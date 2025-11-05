@@ -952,3 +952,255 @@ table.sessions {
 .sessions-scroll td.actions-cell button {
   margin-right: 6px;
 }
+
+/* Detector */
+.detector {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.detector__intro,
+.detector__live,
+.detector__events {
+  background: rgba(10, 14, 24, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
+}
+
+.detector__intro h1 {
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.detector__consent {
+  margin: 0 auto 16px;
+  max-width: 720px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.detector__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.detector__controls button {
+  min-width: 120px;
+}
+
+.detector__settings {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.detector__settings label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.detector__settings input[type='range'] {
+  accent-color: var(--ok);
+  width: 200px;
+}
+
+.detector__value {
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+  text-align: right;
+  color: var(--text);
+}
+
+.detector__hint {
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.detector__live {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 24px;
+  align-items: start;
+}
+
+.detector__canvas-wrap {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #020409;
+}
+
+.detector__canvas-wrap canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.detector__metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.detector__metric {
+  font-size: 18px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.detector__sparkline {
+  width: 100%;
+  max-width: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.detector__events-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.detector__events-head h2 {
+  margin: 0;
+}
+
+.detector__events-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.detector__error {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(255, 107, 217, 0.15);
+  border: 1px solid rgba(255, 107, 217, 0.4);
+}
+
+.detector__event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.detector__event-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 24px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.detector__event-item {
+  display: grid;
+  gap: 12px;
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(6, 10, 18, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detector__event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 15px;
+}
+
+.detector__event-meta strong {
+  font-weight: 600;
+}
+
+.detector__event-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.detector__event-preview img {
+  width: 100%;
+  max-width: 240px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.detector__event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.detector__event-actions .secondary {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.detector__event-info {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 920px) {
+  .detector__live {
+    grid-template-columns: 1fr;
+  }
+
+  .detector__metrics {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .detector__sparkline {
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .detector {
+    padding: 16px 12px 48px;
+  }
+
+  .detector__intro,
+  .detector__live,
+  .detector__events {
+    padding: 20px 16px;
+  }
+
+  .detector__controls button {
+    flex: 1 1 120px;
+  }
+
+  .detector__settings label {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .detector__settings input[type='range'] {
+    width: 100%;
+    max-width: 280px;
+  }
+}
