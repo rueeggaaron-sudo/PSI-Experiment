@@ -26,6 +26,9 @@ body {
   height: 100%;
   margin: 0;
   background: var(--bg);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
   color: var(--text);
   font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
