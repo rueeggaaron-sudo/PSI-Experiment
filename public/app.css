@@ -1,18 +1,21 @@
 /* EDIT: CONFIG (Farben, Look & Größen) */
 :root {
-  --bg: #0b0f10;
-  --text: #e8ebec;
-  --muted: #b9c2c6;
-  --ok: #6dff65;
-  --ok-soft: rgba(109, 255, 101, 0.45);
-  --bad: #ff6b6b;
-  --bad-soft: rgba(255, 107, 107, 0.55);
-  --btc: #F7931A;
-  --sep: rgba(255, 255, 255, 0.08);
-  --dot: #e1e5e9;
-  --ring-bg: #06090d;
-  --ring-border: #1b2126;
-  --infinity: #ff7a1a;
+  --bg: radial-gradient(circle at 20% 20%, rgba(128, 0, 255, 0.45), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgba(0, 255, 209, 0.35), transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(255, 75, 175, 0.4), transparent 60%),
+    #04060b;
+  --text: #f4f3ff;
+  --muted: rgba(209, 208, 238, 0.82);
+  --ok: #71ffca;
+  --ok-soft: rgba(113, 255, 202, 0.45);
+  --bad: #ff6bd9;
+  --bad-soft: rgba(255, 107, 217, 0.55);
+  --btc: #ffb347;
+  --sep: rgba(255, 255, 255, 0.12);
+  --dot: rgba(244, 243, 255, 0.85);
+  --ring-bg: rgba(12, 14, 28, 0.88);
+  --ring-border: rgba(86, 112, 168, 0.4);
+  --infinity: #ff9bff;
   --ring-size: 360px;
   --symbol-size: 132px;
 }
