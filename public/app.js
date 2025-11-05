@@ -1,5 +1,6 @@
 import { mountPsychokinesis, unmountPsychokinesis } from './experiments/psychokinesis.js';
 import { mountPrecognition, unmountPrecognition } from './experiments/precognition.js';
+import { mountItk, unmountItk } from './experiments/itk.js';
 import { initializeConsent } from './helpers/consent.js';
 import { initializeToasts, triggerDataExport } from './helpers/data.js';
 
@@ -13,6 +14,11 @@ const ROUTES = {
     label: 'Präkognition',
     mount: mountPrecognition,
     unmount: unmountPrecognition,
+  },
+  itk: {
+    label: 'Transkommunikation',
+    mount: mountItk,
+    unmount: unmountItk,
   },
 };
 
