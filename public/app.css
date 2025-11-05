@@ -21,11 +21,17 @@
 }
 /* /EDIT: CONFIG (Farben, Look & Größen) */
 
-html,
-body {
+html {
   height: 100%;
+}
+
+body {
+  min-height: 100%;
   margin: 0;
   background: var(--bg);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
   color: var(--text);
   font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
