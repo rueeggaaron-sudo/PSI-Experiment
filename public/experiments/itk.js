@@ -181,6 +181,7 @@ function createNoiseLoop({ canvas, initialSettings, onFrameUpdate, prefersReduce
   let noiseBuffer = null;
   const deviceScale = Math.min(window.devicePixelRatio || 1, 2);
   const hasCrypto = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
+  const maxCryptoChunk = 65536;
 
   const updateCanvasScale = scale => {
     const safeScale = Math.max(1, Number(scale) || 1);
@@ -218,7 +219,10 @@ function createNoiseLoop({ canvas, initialSettings, onFrameUpdate, prefersReduce
     }
 
     if (hasCrypto) {
-      crypto.getRandomValues(noiseBuffer);
+      for (let offset = 0; offset < noiseBuffer.length; offset += maxCryptoChunk) {
+        const chunk = noiseBuffer.subarray(offset, Math.min(offset + maxCryptoChunk, noiseBuffer.length));
+        crypto.getRandomValues(chunk);
+      }
     } else {
       for (let i = 0; i < noiseBuffer.length; i += 1) {
         noiseBuffer[i] = Math.floor(Math.random() * 256);
