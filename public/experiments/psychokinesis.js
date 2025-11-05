@@ -941,11 +941,21 @@ function initPsychokinesisExperiment() {
     const targetHitRate=targetActive && total ? hits/total : null;
     const targetZ=targetActive ? (diff*(focusDir||1))/denom : null;
     const targetP=targetActive && targetZ!==null ? pTwoTailFromZ(targetZ) : null;
+    let tendencySigned=biasPct;
+    if(targetActive){
+      const signedDiff=(hits*2) - total;
+      tendencySigned=total ? (signedDiff/total)*100 : 0;
+    }else{
+      const sign=diff===0?0:(diff>0?1:-1);
+      tendencySigned=total ? sign*(absDiff/total)*100 : 0;
+    }
+    const startIndex=Number(startSel.value);
+    const startField=Number.isFinite(startIndex)?Math.max(1, Math.round(startIndex)+1):1;
     return {
       time:new Date().toISOString(),
       duration,
       speed,
-      startField:Number(startSel.value)+1,
+      startField,
       focus:focusLabel,
       steps:total,
       cw,
