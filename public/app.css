@@ -213,6 +213,7 @@ body {
 }
 
 /* EDIT: MYSTIC BACKDROP (dezent, kann entfernt werden) */
+/* Shared star backdrop used by all experiment views */
 body.bg-stars::before {
   content: "";
   position: fixed;
@@ -235,25 +236,6 @@ body.bg-stars::after {
     75vw 50vh #223038, 90vw 30vh #223038, 5vw 55vh #223038;
   opacity: 0.18;
   filter: blur(0.2px);
-}
-body.bg-mist::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.06), transparent 45%),
-    radial-gradient(circle at 80% 30%, rgba(146, 206, 255, 0.08), transparent 55%),
-    radial-gradient(circle at 50% 80%, rgba(255, 209, 165, 0.05), transparent 50%);
-  opacity: 0.9;
-}
-body.bg-mist::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(18, 33, 43, 0.65), rgba(18, 33, 43, 0.2));
-  mix-blend-mode: screen;
-  opacity: 0.6;
 }
 /* /EDIT: MYSTIC BACKDROP */
 

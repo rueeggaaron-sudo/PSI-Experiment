@@ -366,7 +366,8 @@ export function mountPrecognition(target = document.getElementById('app-root')) 
   const root = target || document.getElementById('app-root');
   if (!root) return;
   if (typeof document !== 'undefined' && document.body) {
-    document.body.classList.add('bg-mist');
+    document.body.classList.remove('bg-mist');
+    document.body.classList.add('bg-stars');
   }
   root.innerHTML = template;
   installSubmitExperimentData();
@@ -378,7 +379,7 @@ export function unmountPrecognition(target = document.getElementById('app-root')
   if (!root) return;
   root.innerHTML = '';
   if (typeof document !== 'undefined' && document.body) {
-    document.body.classList.remove('bg-mist');
+    document.body.classList.remove('bg-stars');
   }
 }
 
