@@ -2,6 +2,7 @@ import { mountPsychokinesis, unmountPsychokinesis } from './experiments/psychoki
 import { mountPrecognition, unmountPrecognition } from './experiments/precognition.js';
 import { mountItk, unmountItk } from './experiments/itk.js';
 import { mountDetector, unmountDetector } from './experiments/detector.js';
+import { mountBtcAudio, unmountBtcAudio } from './experiments/btc-audio.js';
 import { initializeConsent } from './helpers/consent.js';
 import { initializeToasts, triggerDataExport } from './helpers/data.js';
 
@@ -26,6 +27,11 @@ const ROUTES = {
     mount: mountDetector,
     unmount: unmountDetector,
   },
+  'btc-audio': {
+    label: 'Bitcoin Hash → Akustische Frequenzmuster',
+    mount: mountBtcAudio,
+    unmount: unmountBtcAudio,
+  },
 };
 
 const DEFAULT_ROUTE = 'psychokinesis';
@@ -49,6 +55,12 @@ const consentController = initializeConsent(consentRoot, {
     });
   },
 });
+
+const routeContext = {
+  consentController,
+  triggerDataExport,
+  showToast,
+};
 
 let activeRoute = null;
 
@@ -111,9 +123,9 @@ function mountRoute(slug) {
   const route = ROUTES[slug] || ROUTES[DEFAULT_ROUTE];
   if (!route) return;
   if (activeRoute && typeof activeRoute.unmount === 'function') {
-    activeRoute.unmount(appRoot);
+    activeRoute.unmount(appRoot, routeContext);
   }
-  route.mount(appRoot);
+  route.mount(appRoot, routeContext);
   activeRoute = route;
   highlightRoute(slug);
 }
