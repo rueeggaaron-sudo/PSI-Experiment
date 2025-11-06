@@ -500,7 +500,7 @@ export function mount({ root, navigate } = {}) {
 
   updateStatus({ message: 'Consent erforderlich.' });
 
-  activeTeardown = async () => {
+  activeTeardown = () => {
     cleanupFns.splice(0).forEach(fn => {
       try {
         fn();
@@ -508,8 +508,11 @@ export function mount({ root, navigate } = {}) {
         // ignore cleanup errors
       }
     });
-    await stopAll({ closeAudio: true });
     root.innerHTML = '';
+    const stopResult = stopAll({ closeAudio: true });
+    if (stopResult && typeof stopResult.catch === 'function') {
+      stopResult.catch(() => {});
+    }
   };
 }
 
