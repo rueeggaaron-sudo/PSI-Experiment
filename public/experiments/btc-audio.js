@@ -32,8 +32,8 @@ const template = `
       <div class="btc-audio__sliders">
         <label class="btc-audio__slider">
           Tempo
-          <input id="btc-audio-tempo" type="range" min="40" max="240" value="120" step="1">
-          <output for="btc-audio-tempo" data-output="tempo">120&nbsp;BPM</output>
+          <input id="btc-audio-tempo" type="range" min="80" max="200" value="120" step="1">
+          <output for="btc-audio-tempo" data-output="tempo">120&nbsp;ms</output>
         </label>
         <label class="btc-audio__slider">
           Lautstärke
@@ -50,6 +50,8 @@ const template = `
       <div class="btc-audio__buttons" role="group" aria-label="Start und Stopp">
         <button type="button" data-action="start" disabled>Start</button>
         <button type="button" data-action="stop" disabled>Stopp</button>
+        <button type="button" class="secondary" data-action="export-json" disabled>Export&nbsp;JSON</button>
+        <button type="button" class="secondary" data-action="export-csv" disabled>Export&nbsp;CSV</button>
       </div>
     </section>
 
@@ -59,8 +61,75 @@ const template = `
   </main>
 `;
 
-const BTC_ENDPOINT = 'https://api.coindesk.com/v1/bpi/currentprice/USD.json';
+const BLOCKCHAIN_ENDPOINT = 'https://blockchain.info/latestblock';
 const MAX_POINTS = 160;
+const BYTE_LOOKAHEAD = 32;
+const TEMPO_MIN_MS = 80;
+const TEMPO_MAX_MS = 200;
+const BYTE_QUEUE_LIMIT = 4096;
+const EVENT_LIMIT = 4096;
+const BYTE_SCALE = {
+  baseMidi: 48,
+  range: 36,
+  referenceNote: 'A4',
+  referenceFrequency: 440,
+};
+
+const clampTempo = value => {
+  if (!Number.isFinite(value)) return 120;
+  return Math.min(TEMPO_MAX_MS, Math.max(TEMPO_MIN_MS, Math.round(value)));
+};
+
+const midiToFrequency = midi =>
+  BYTE_SCALE.referenceFrequency * Math.pow(2, (midi - 69) / 12);
+
+const byteToMidi = byte => {
+  const normalized = Math.min(255, Math.max(0, byte)) / 255;
+  return Math.round(BYTE_SCALE.baseMidi + normalized * BYTE_SCALE.range);
+};
+
+const byteToFrequency = byte => {
+  const midi = byteToMidi(byte);
+  return {
+    midi,
+    frequency: midiToFrequency(midi),
+  };
+};
+
+const createMappingDetails = () => ({
+  type: 'byte_to_equal_tempered',
+  reference: `${BYTE_SCALE.referenceNote}=${BYTE_SCALE.referenceFrequency}Hz`,
+  midi_range: [BYTE_SCALE.baseMidi, BYTE_SCALE.baseMidi + BYTE_SCALE.range],
+  formula: 'frequency = 440 * 2^((midi-69)/12); midi = base + normalized_byte * range',
+});
+
+const generateSessionId = () => {
+  if (typeof crypto !== 'undefined') {
+    if (typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+    }
+  }
+  return `session-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+};
+
+const getRandomBytes = (length = 32) => {
+  const output = new Uint8Array(length);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(output);
+    return output;
+  }
+  for (let i = 0; i < length; i += 1) {
+    output[i] = Math.floor(Math.random() * 256);
+  }
+  return output;
+};
 
 let activeTeardown = null;
 
@@ -88,6 +157,8 @@ export function mount({ root, navigate } = {}) {
   const tempoOutput = root.querySelector('output[data-output="tempo"]');
   const volumeOutput = root.querySelector('output[data-output="volume"]');
   const intervalOutput = root.querySelector('output[data-output="interval"]');
+  const exportJsonBtn = root.querySelector('[data-action="export-json"]');
+  const exportCsvBtn = root.querySelector('[data-action="export-csv"]');
   const canvas = root.querySelector('#btc-audio-canvas');
   const canvasCtx = canvas?.getContext('2d');
 
@@ -109,6 +180,8 @@ export function mount({ root, navigate } = {}) {
     !tempoOutput ||
     !volumeOutput ||
     !intervalOutput ||
+    !exportJsonBtn ||
+    !exportCsvBtn ||
     !canvas ||
     !canvasCtx
   ) {
@@ -119,18 +192,27 @@ export function mount({ root, navigate } = {}) {
     consentGiven: false,
     running: false,
     source: 'btc',
-    tempo: Number(tempoInput.value) || 120,
+    tempo: clampTempo(Number(tempoInput.value) || 120),
     volume: Number(volumeInput.value) || 0.4,
     interval: Number(intervalInput.value) || 30,
     lastValue: null,
+    lastHash: null,
     lastUpdated: null,
     audioCtx: null,
     masterGain: null,
+    analyser: null,
     fetchTimer: null,
-    tickTimer: null,
     fetchController: null,
     visualData: [],
-    localPhase: 0,
+    byteQueue: [],
+    nextNoteTime: 0,
+    schedulerRaf: 0,
+    sessionId: null,
+    sessionStarted: null,
+    events: [],
+    eventCounter: 0,
+    mappingDetails: createMappingDetails(),
+    connection: 'idle',
   };
 
   const cleanupFns = [];
@@ -165,6 +247,210 @@ export function mount({ root, navigate } = {}) {
       }
     });
     canvasCtx.stroke();
+  };
+
+  const setConnectionState = (value, message) => {
+    state.connection = value;
+    if (message) {
+      updateStatus({ message });
+    }
+  };
+
+  const enqueueBytes = (bytes, meta = {}) => {
+    if (!bytes || typeof bytes.forEach !== 'function') return;
+    bytes.forEach(byte => {
+      state.byteQueue.push({
+        byte,
+        ...meta,
+      });
+      if (state.byteQueue.length > BYTE_QUEUE_LIMIT) {
+        state.byteQueue.splice(0, state.byteQueue.length - BYTE_QUEUE_LIMIT);
+      }
+    });
+  };
+
+  const clearByteQueue = () => {
+    state.byteQueue.length = 0;
+  };
+
+  const ensureLocalBytes = () => {
+    if (state.source !== 'local') return;
+    if (state.byteQueue.length >= BYTE_LOOKAHEAD) return;
+    const bytes = getRandomBytes(BYTE_LOOKAHEAD);
+    enqueueBytes(bytes, { source: 'local' });
+  };
+
+  const consumeByte = () => {
+    if (state.source === 'local') {
+      ensureLocalBytes();
+    }
+    if (!state.byteQueue.length) {
+      return null;
+    }
+    return state.byteQueue.shift();
+  };
+
+  const stopScheduler = () => {
+    if (state.schedulerRaf) {
+      cancelAnimationFrame(state.schedulerRaf);
+      state.schedulerRaf = 0;
+    }
+  };
+
+  const schedulerLoop = () => {
+    if (!state.running || !state.audioCtx) {
+      state.schedulerRaf = 0;
+      return;
+    }
+    const lookahead = Math.max(0.05, state.tempo / 1000);
+    const now = state.audioCtx.currentTime;
+    if (state.nextNoteTime < now) {
+      state.nextNoteTime = now;
+    }
+    while (state.nextNoteTime <= now + lookahead) {
+      const next = consumeByte();
+      if (!next) break;
+      const scheduledAt = state.nextNoteTime;
+      scheduleOscillator({
+        byte: next.byte,
+        blockHeight: next.blockHeight,
+        blockHash: next.blockHash,
+        source: next.source || state.source,
+        scheduledAt,
+      });
+      state.nextNoteTime += state.tempo / 1000;
+    }
+    state.schedulerRaf = requestAnimationFrame(schedulerLoop);
+  };
+
+  const startScheduler = () => {
+    stopScheduler();
+    if (!state.audioCtx) return;
+    state.nextNoteTime = state.audioCtx.currentTime + 0.05;
+    state.schedulerRaf = requestAnimationFrame(schedulerLoop);
+  };
+
+  const buildExportPayload = () => {
+    if (!state.sessionId) {
+      return null;
+    }
+    const durationMs = state.sessionStarted ? Date.now() - state.sessionStarted : null;
+    const mapping = state.mappingDetails || createMappingDetails();
+    return {
+      session_id: state.sessionId,
+      experiment_type: 'btc_audio',
+      started_at: state.sessionStarted ? new Date(state.sessionStarted).toISOString() : null,
+      duration_ms: durationMs,
+      source: state.source,
+      connection: state.connection,
+      tempo_ms: state.tempo,
+      interval_s: state.interval,
+      volume: state.volume,
+      last_hash: state.lastHash,
+      mapping,
+      events: state.events.map(event => ({
+        index: event.index,
+        ts: event.ts,
+        audio_time_s: Number.isFinite(event.scheduledAt)
+          ? Number(event.scheduledAt.toFixed(4))
+          : null,
+        byte: event.byte,
+        midi: event.midi,
+        frequency_hz: Number(event.frequency.toFixed(4)),
+        source: event.source,
+        block_height: event.blockHeight,
+        block_hash: event.blockHash,
+      })),
+      exported_at: new Date().toISOString(),
+      tempo_range_ms: [TEMPO_MIN_MS, TEMPO_MAX_MS],
+    };
+  };
+
+  const downloadFile = (filename, mime, data) => {
+    try {
+      const blob = new Blob([data], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 0);
+    } catch (error) {
+      setError(`Export fehlgeschlagen: ${error.message}`);
+    }
+  };
+
+  const exportJson = () => {
+    const payload = buildExportPayload();
+    if (!payload) return;
+    downloadFile(`btc-audio-${payload.session_id}.json`, 'application/json', JSON.stringify(payload, null, 2));
+  };
+
+  const exportCsv = () => {
+    const payload = buildExportPayload();
+    if (!payload) return;
+    const mappingJson = JSON.stringify(payload.mapping || {});
+    const escape = value => {
+      if (value === null || value === undefined) return '';
+      const str = String(value);
+      if (/[",\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    const header = [
+      'session_id',
+      'experiment_type',
+      'started_at',
+      'exported_at',
+      'source',
+      'connection',
+      'tempo_ms',
+      'interval_s',
+      'volume',
+      'event_index',
+      'ts',
+      'audio_time_s',
+      'byte',
+      'midi',
+      'frequency_hz',
+      'block_height',
+      'block_hash',
+      'last_hash',
+      'mapping_details',
+    ];
+    const rows = [header.join(',')];
+    const events = payload.events.length ? payload.events : [{ index: '', ts: '', audio_time_s: '', byte: '', midi: '', frequency_hz: '', block_height: '', block_hash: '' }];
+    events.forEach(event => {
+      rows.push(
+        [
+          escape(payload.session_id),
+          escape(payload.experiment_type),
+          escape(payload.started_at),
+          escape(payload.exported_at),
+          escape(payload.source),
+          escape(payload.connection),
+          escape(payload.tempo_ms),
+          escape(payload.interval_s),
+          escape(payload.volume),
+          escape(event.index),
+          escape(event.ts),
+          escape(event.audio_time_s),
+          escape(event.byte),
+          escape(event.midi),
+          escape(event.frequency_hz),
+          escape(event.block_height),
+          escape(event.block_hash),
+          escape(payload.last_hash),
+          escape(mappingJson),
+        ].join(',')
+      );
+    });
+    downloadFile(`btc-audio-${payload.session_id}.csv`, 'text/csv', rows.join('\n'));
   };
 
   const updateStatus = ({
@@ -206,6 +492,12 @@ export function mount({ root, navigate } = {}) {
     stopBtn.disabled = !running;
   };
 
+  const updateExportButtons = () => {
+    const hasEvents = state.events.length > 0;
+    exportJsonBtn.disabled = !hasEvents;
+    exportCsvBtn.disabled = !hasEvents;
+  };
+
   const ensureAudioContext = async () => {
     if (!state.audioCtx) {
       try {
@@ -215,8 +507,11 @@ export function mount({ root, navigate } = {}) {
         throw error;
       }
       state.masterGain = state.audioCtx.createGain();
-      state.masterGain.gain.value = state.volume;
-      state.masterGain.connect(state.audioCtx.destination);
+      state.masterGain.gain.value = Math.max(0, Math.min(1, state.volume));
+      state.analyser = state.audioCtx.createAnalyser();
+      state.analyser.fftSize = 2048;
+      state.masterGain.connect(state.analyser);
+      state.analyser.connect(state.audioCtx.destination);
     }
     if (state.audioCtx.state === 'suspended') {
       await state.audioCtx.resume();
@@ -224,36 +519,51 @@ export function mount({ root, navigate } = {}) {
     return state.audioCtx;
   };
 
-  const triggerTone = value => {
+  const scheduleOscillator = ({ byte, blockHeight, blockHash, scheduledAt, source }) => {
     if (!state.audioCtx || !state.masterGain) return;
-    const freqBase = 220;
-    const freq = Number.isFinite(value)
-      ? Math.max(110, Math.min(880, freqBase + Math.log(value) * 12))
-      : 330;
+    const { midi, frequency } = byteToFrequency(byte);
     const osc = state.audioCtx.createOscillator();
     const gain = state.audioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.value = freq;
-    gain.gain.value = 0;
+    osc.frequency.setValueAtTime(frequency, scheduledAt);
+    gain.gain.setValueAtTime(0, scheduledAt);
+    gain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, state.volume)), scheduledAt + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, scheduledAt + 0.4);
     osc.connect(gain).connect(state.masterGain);
-    const now = state.audioCtx.currentTime;
-    const volume = Math.max(0, Math.min(1, state.volume));
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(volume, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
-    osc.start(now);
-    osc.stop(now + 0.3);
+    osc.start(scheduledAt);
+    osc.stop(scheduledAt + 0.5);
+
+    const index = state.eventCounter++;
+    state.events.push({
+      index,
+      ts: Date.now(),
+      scheduledAt,
+      byte,
+      midi,
+      frequency,
+      source,
+      blockHeight: Number.isFinite(blockHeight) ? blockHeight : null,
+      blockHash: typeof blockHash === 'string' ? blockHash : null,
+    });
+    if (state.events.length > EVENT_LIMIT) {
+      state.events.splice(0, state.events.length - EVENT_LIMIT);
+    }
+    updateExportButtons();
   };
 
-  const appendValue = value => {
+  const appendValue = (value, { label, decimals = 2, unit } = {}) => {
     if (!Number.isFinite(value)) return;
     state.visualData.push(value);
     if (state.visualData.length > MAX_POINTS) {
       state.visualData.splice(0, state.visualData.length - MAX_POINTS);
     }
     drawVisual();
+    const valueLabel =
+      typeof label === 'string'
+        ? label
+        : `${value.toFixed(decimals)}${unit ? ` ${unit}` : ''}`;
     updateStatus({
-      value: `${value.toFixed(2)} USD`,
+      value: valueLabel,
       updated: state.lastUpdated ? new Date(state.lastUpdated).toLocaleTimeString() : '--',
     });
   };
@@ -269,18 +579,14 @@ export function mount({ root, navigate } = {}) {
     }
   };
 
-  const stopTickLoop = () => {
-    if (state.tickTimer) {
-      clearInterval(state.tickTimer);
-      state.tickTimer = null;
-    }
-  };
-
   const stopAll = async ({ closeAudio = false } = {}) => {
     state.running = false;
     stopFetchLoop();
-    stopTickLoop();
+    stopScheduler();
+    clearByteQueue();
     setButtons(false);
+    updateExportButtons();
+    state.connection = 'idle';
     updateStatus({ stateText: 'Gestoppt', message: 'Bereit.' });
     if (closeAudio && state.audioCtx) {
       const ctx = state.audioCtx;
@@ -296,77 +602,94 @@ export function mount({ root, navigate } = {}) {
 
   const handleBtcFetch = async () => {
     stopFetchLoop();
+    clearByteQueue();
     const controller = new AbortController();
     state.fetchController = controller;
     const fetchInterval = Math.max(5, state.interval) * 1000;
 
-    const loadPrice = async () => {
+    const loadBlock = async () => {
       try {
         setError('');
-        updateStatus({ message: 'Hole BTC-Kurs…' });
-        const response = await fetch(BTC_ENDPOINT, {
+        setConnectionState('connecting', 'Verbinde zur Blockchain…');
+        const url = `${BLOCKCHAIN_ENDPOINT}?cors=true&_=${Date.now()}`;
+        const response = await fetch(url, {
           cache: 'no-store',
+          mode: 'cors',
+          credentials: 'omit',
           signal: controller.signal,
         });
+        if (response.type === 'opaque') {
+          throw new Error('CORS blockiert Antwort');
+        }
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         const json = await response.json();
-        const price = Number(json?.bpi?.USD?.rate_float);
-        if (!Number.isFinite(price)) {
-          throw new Error('Kein Kurs verfügbar');
+        const hash = typeof json?.hash === 'string' ? json.hash : null;
+        const height = Number(json?.height);
+        if (!hash) {
+          throw new Error('Kein Hash in Antwort');
         }
-        state.lastValue = price;
+        const bytes = [];
+        for (let i = 0; i < hash.length; i += 2) {
+          const fragment = hash.slice(i, i + 2);
+          const byte = Number.parseInt(fragment, 16);
+          if (Number.isFinite(byte)) {
+            bytes.push(byte);
+          }
+        }
+        if (!bytes.length) {
+          throw new Error('Hash konnte nicht in Bytes umgewandelt werden');
+        }
+        state.lastHash = hash;
+        state.lastValue = Number.isFinite(height) ? height : bytes[0];
         state.lastUpdated = Date.now();
-        appendValue(price);
-        updateStatus({ message: 'Live-Modus aktiv.' });
+        appendValue(state.lastValue, {
+          label: Number.isFinite(height) ? `Block #${height}` : `Hash ${hash.slice(0, 8)}`,
+          decimals: Number.isFinite(height) ? 0 : 2,
+        });
+        enqueueBytes(bytes, { source: 'btc', blockHeight: height, blockHash: hash });
+        setConnectionState('connected', 'BTC-Quelle verbunden.');
+        updateStatus({ sourceText: 'BTC' });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
-        setError(`BTC-Kurs konnte nicht geladen werden: ${error.message}`);
-        updateStatus({ message: 'Fallback auf letzten Wert.' });
+        setError(`Blockchain-API: ${error.message}`);
+        setConnectionState('error', 'Fehler – Fallback mit lokalen Zufallsdaten aktiv.');
+        const fallbackBytes = getRandomBytes(BYTE_LOOKAHEAD);
+        enqueueBytes(fallbackBytes, { source: 'fallback' });
+        const avg = fallbackBytes.reduce((sum, value) => sum + value, 0) / fallbackBytes.length;
+        state.lastValue = avg;
+        state.lastHash = null;
+        state.lastUpdated = Date.now();
+        appendValue(avg, { label: `Fallback ${Math.round(avg)}`, decimals: 0 });
       }
     };
 
-    await loadPrice();
+    await loadBlock();
     if (!controller.signal.aborted) {
-      state.fetchTimer = setInterval(loadPrice, fetchInterval);
+      state.fetchTimer = setInterval(loadBlock, fetchInterval);
     }
   };
 
-  const generateLocalValue = () => {
-    state.localPhase += (state.tempo / 60) * 0.1;
-    const sinus = Math.sin(state.localPhase);
-    const noise = (Math.random() - 0.5) * 200;
-    const baseline = 20000;
-    const span = 5000;
-    const value = baseline + sinus * span + noise;
-    state.lastUpdated = Date.now();
-    state.lastValue = value;
-    return value;
-  };
-
-  const runTick = () => {
-    if (!state.running) return;
-    let value = null;
-    if (state.source === 'btc') {
-      value = state.lastValue;
-      if (!Number.isFinite(value)) {
-        return;
-      }
-    } else {
-      value = generateLocalValue();
-      appendValue(value);
-    }
-    triggerTone(value);
-  };
-
-  const startTickLoop = () => {
-    stopTickLoop();
-    const tempo = Math.max(40, state.tempo);
-    const delay = Math.max(100, Math.round((60_000 / tempo)));
-    state.tickTimer = setInterval(runTick, delay);
+  const startLocalMode = () => {
+    stopFetchLoop();
+    clearByteQueue();
+    setError('');
+    setConnectionState('local', 'Lokaler Zufallsmodus aktiv.');
+    const pushLocal = () => {
+      const bytes = getRandomBytes(BYTE_LOOKAHEAD);
+      enqueueBytes(bytes, { source: 'local' });
+      const avg = bytes.reduce((sum, value) => sum + value, 0) / bytes.length;
+      state.lastValue = avg;
+      state.lastHash = null;
+      state.lastUpdated = Date.now();
+      appendValue(avg, { label: `Byte-Mittel ${Math.round(avg)}`, decimals: 0 });
+    };
+    pushLocal();
+    const intervalMs = Math.max(5, state.interval) * 1000;
+    state.fetchTimer = setInterval(pushLocal, intervalMs);
   };
 
   const startAll = async () => {
@@ -387,15 +710,24 @@ export function mount({ root, navigate } = {}) {
     clearCanvas();
     state.visualData.length = 0;
     state.lastValue = null;
+    state.lastHash = null;
     state.lastUpdated = null;
+    state.events = [];
+    state.eventCounter = 0;
+    updateExportButtons();
+    updateStatus({ value: '--', updated: '--' });
+    state.sessionId = generateSessionId();
+    state.sessionStarted = Date.now();
+    state.mappingDetails = createMappingDetails();
+    clearByteQueue();
+    startScheduler();
     if (state.source === 'btc') {
       updateStatus({ sourceText: 'BTC' });
       handleBtcFetch();
     } else {
       updateStatus({ sourceText: 'Lokal' });
-      appendValue(generateLocalValue());
+      startLocalMode();
     }
-    startTickLoop();
   };
 
   const handleConsent = () => {
@@ -416,8 +748,7 @@ export function mount({ root, navigate } = {}) {
       if (value === 'btc') {
         handleBtcFetch();
       } else {
-        stopFetchLoop();
-        appendValue(generateLocalValue());
+        startLocalMode();
       }
     }
   };
@@ -425,10 +756,11 @@ export function mount({ root, navigate } = {}) {
   const handleTempoInput = event => {
     const value = Number(event.target.value);
     if (!Number.isFinite(value)) return;
-    state.tempo = value;
-    tempoOutput.textContent = `${value}\u00A0BPM`;
-    if (state.running) {
-      startTickLoop();
+    const tempoMs = clampTempo(value);
+    state.tempo = tempoMs;
+    tempoOutput.textContent = `${tempoMs}\u00A0ms`;
+    if (state.running && state.audioCtx) {
+      startScheduler();
     }
   };
 
@@ -449,8 +781,12 @@ export function mount({ root, navigate } = {}) {
     if (!Number.isFinite(value)) return;
     state.interval = value;
     intervalOutput.textContent = `${value}\u00A0s`;
-    if (state.running && state.source === 'btc') {
-      handleBtcFetch();
+    if (state.running) {
+      if (state.source === 'btc') {
+        handleBtcFetch();
+      } else {
+        startLocalMode();
+      }
     }
   };
 
@@ -467,9 +803,10 @@ export function mount({ root, navigate } = {}) {
   };
 
   clearCanvas();
-  tempoOutput.textContent = `${state.tempo}\u00A0BPM`;
+  tempoOutput.textContent = `${state.tempo}\u00A0ms`;
   volumeOutput.textContent = `${Math.round(state.volume * 100)}\u00A0%`;
   intervalOutput.textContent = `${state.interval}\u00A0s`;
+  updateExportButtons();
 
   acceptConsentBtn.addEventListener('click', handleConsent);
   cleanupFns.push(() => acceptConsentBtn.removeEventListener('click', handleConsent));
@@ -488,6 +825,12 @@ export function mount({ root, navigate } = {}) {
 
   intervalInput.addEventListener('input', handleIntervalInput);
   cleanupFns.push(() => intervalInput.removeEventListener('input', handleIntervalInput));
+
+  exportJsonBtn.addEventListener('click', exportJson);
+  cleanupFns.push(() => exportJsonBtn.removeEventListener('click', exportJson));
+
+  exportCsvBtn.addEventListener('click', exportCsv);
+  cleanupFns.push(() => exportCsvBtn.removeEventListener('click', exportCsv));
 
   sourceRadios.forEach(radio => {
     const handler = handleSourceChange;
