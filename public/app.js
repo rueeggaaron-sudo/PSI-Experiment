@@ -6,6 +6,13 @@ import { mountBtcAudio, unmountBtcAudio } from './experiments/btc-audio.js';
 import { initializeConsent } from './helpers/consent.js';
 import { initializeToasts, triggerDataExport } from './helpers/data.js';
 
+const experimentsRegistry =
+  typeof window !== 'undefined'
+    ? (window.__psiExperiments = window.__psiExperiments || {})
+    : {};
+
+const btcAudioRegistryEntry = experimentsRegistry['btc-audio'] || {};
+
 const ROUTES = {
   psychokinesis: {
     label: 'Psychokinese',
@@ -29,8 +36,8 @@ const ROUTES = {
   },
   'btc-audio': {
     label: 'Bitcoin Hash → Akustische Frequenzmuster',
-    mount: mountBtcAudio,
-    unmount: unmountBtcAudio,
+    mount: btcAudioRegistryEntry.mount || mountBtcAudio,
+    unmount: btcAudioRegistryEntry.unmount || unmountBtcAudio,
   },
 };
 

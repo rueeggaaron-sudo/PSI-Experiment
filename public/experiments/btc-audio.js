@@ -88,6 +88,13 @@ export function unmountBtcAudio(root) {
   target.innerHTML = '';
 }
 
+export { mountBtcAudio as mount, unmountBtcAudio as unmount };
+
+export default {
+  mount: mountBtcAudio,
+  unmount: unmountBtcAudio,
+};
+
 if (typeof window !== 'undefined') {
   window.__psiExperiments = window.__psiExperiments || {};
   window.__psiExperiments['btc-audio'] = {
