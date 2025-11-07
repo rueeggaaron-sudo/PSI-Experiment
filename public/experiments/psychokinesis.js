@@ -974,6 +974,8 @@ function initPsychokinesisExperiment() {
   function makeUploadPayload(endTs){
     const totalSteps=cw+ccw;
     if(!totalSteps) return null;
+    const focusValue=targetMode;
+    if(focusValue!=='cw' && focusValue!=='ccw') return null;
     const safeEnd=(typeof endTs==='number' && Number.isFinite(endTs))?Math.round(endTs):Date.now();
     const durationMs=startedAt?Math.max(0, safeEnd-startedAt):0;
     const plannedDuration=Number(durSel.value)||0;
@@ -982,7 +984,6 @@ function initPsychokinesisExperiment() {
     const speedMs=(Number.isFinite(speedInput) && speedInput>0)?speedInput:Math.max(0, interval);
     const startIndex=Number(startSel.value);
     const startField=Number.isFinite(startIndex)?Math.max(1, Math.round(startIndex)+1):1;
-    const focusValue=targetMode;
     const diff=cw-ccw;
     const absDiff=Math.abs(diff);
     const denom=Math.sqrt(totalSteps||1);
@@ -991,18 +992,7 @@ function initPsychokinesisExperiment() {
     const safeBiasZ=Number.isFinite(lastBiasZ)?lastBiasZ:0;
     const lastBiasP=lastStats && Number.isFinite(Number(lastStats.biasP))?Number(lastStats.biasP):pTwoTailFromZ(safeBiasZ);
     const safeBiasP=Number.isFinite(lastBiasP)?Math.min(Math.max(lastBiasP,0),1):Math.min(Math.max(pTwoTailFromZ(safeBiasZ),0),1);
-    const targetActive=focusValue!=='none' && focusDir!==0;
-    const targetZ=targetActive? (diff*(focusDir||1))/denom : null;
-    const targetP=targetZ!==null?Math.min(Math.max(pTwoTailFromZ(targetZ),0),1):null;
-    const targetHitRate=targetActive?hits/totalSteps:null;
-    let tendencySigned=0;
-    if(targetActive){
-      const signedDiff=(hits*2) - totalSteps;
-      tendencySigned=totalSteps? (signedDiff/totalSteps)*100 : 0;
-    }else{
-      const sign=diff===0?0:(diff>0?1:-1);
-      tendencySigned=totalSteps? sign*(absDiff/totalSteps)*100 : 0;
-    }
+    const targetActive=focusDir!==0;
     return {
       ts:safeEnd,
       duration_min:Number(Math.max(0, durationMinutes).toFixed(4)),
@@ -1014,12 +1004,8 @@ function initPsychokinesisExperiment() {
       ccw,
       hits:targetActive?hits:0,
       misses:targetActive?misses:0,
-      bias_pct:Number(tendencySigned.toFixed(4)),
-      z:safeBiasZ,
-      p:safeBiasP,
-      target_z:targetZ,
-      target_p:targetP,
-      hit_rate:targetHitRate!==null?Number(targetHitRate.toFixed(4)):null
+      z:Number(safeBiasZ),
+      p:Number(safeBiasP)
     };
   }
 
