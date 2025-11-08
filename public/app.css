@@ -37,9 +37,13 @@ body {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(6, 10, 18, 0.9);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--sep);
+  background: linear-gradient(
+    135deg,
+    rgba(35, 22, 72, 0.92),
+    rgba(6, 8, 24, 0.9)
+  );
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(161, 132, 255, 0.32);
 }
 
 .site-header__inner {
@@ -53,16 +57,19 @@ body {
 }
 
 .site-header__brand {
-  color: #fff;
+  color: #f9f6ff;
   text-decoration: none;
+  font-family: "Cinzel Decorative", "IM Fell English", "Times New Roman", serif;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  font-size: 20px;
+  letter-spacing: 0.12em;
+  font-size: clamp(28px, 4vw, 40px);
+  text-transform: uppercase;
+  text-shadow: 0 6px 18px rgba(58, 16, 119, 0.55);
   display: block;
 }
 
 .site-header__brand:hover {
-  color: var(--ok);
+  color: #d7c6ff;
 }
 
 .site-header__nav {
@@ -160,8 +167,9 @@ body {
 }
 
 .app-nav__link:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(123, 98, 255, 0.18);
+  border-color: rgba(173, 147, 255, 0.3);
+  color: #fdfbff;
 }
 
 .app-nav__link--secondary {
@@ -173,9 +181,10 @@ body {
 }
 
 .app-nav__link--active {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(139, 109, 255, 0.28);
+  border-color: rgba(198, 173, 255, 0.4);
   color: #fff;
+  box-shadow: 0 12px 28px rgba(74, 42, 163, 0.35);
 }
 
 .app-nav__button {
