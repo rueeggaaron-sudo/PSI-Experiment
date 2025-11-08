@@ -40,10 +40,8 @@ const navRoot = document.getElementById('nav');
 const appRoot = document.getElementById('app-root');
 const consentRoot = document.getElementById('consent-modal');
 const toastRoot = document.getElementById('toast-root');
-let navOverlayRoot = null;
-let navOverlayListenersBound = false;
-let navOverlayOpen = false;
-let navOverlayLastFocus = null;
+let navMenuOpen = false;
+let navMenuListenersBound = false;
 
 const { showToast } = initializeToasts(toastRoot);
 const consentController = initializeConsent(consentRoot, {
@@ -75,18 +73,28 @@ function renderNav() {
       const label = route && route.label ? route.label : slug;
       return `<a class="app-nav__link" href="#/${slug}" data-route="${slug}">${label}</a>`;
     })
-    .join('\n      ');
+    .join('\n            ');
   navRoot.innerHTML = `
-    <nav class="app-nav" aria-label="Navigation">
-      ${links}
-      <span class="app-nav__spacer"></span>
-      <button type="button" class="app-nav__button secondary" data-action="experiments">Experimente</button>
-      <button type="button" class="app-nav__button" data-action="consent"></button>
-      <button type="button" class="app-nav__button secondary" data-action="export">Export</button>
-      <a class="app-nav__link app-nav__link--secondary" href="/privacy.html">Datenschutz</a>
-    </nav>
+    <header class="site-header" data-menu-open="false">
+      <div class="site-header__inner">
+        <a class="site-header__brand" href="#/${DEFAULT_ROUTE}" data-route="${DEFAULT_ROUTE}">PSI&nbsp;Experimente</a>
+        <button type="button" class="site-header__toggle" data-action="toggle-menu" aria-expanded="false" aria-controls="site-menu">
+          Menü
+          <span class="site-header__toggle-icon" aria-hidden="true"></span>
+        </button>
+        <nav id="site-menu" class="site-header__nav" aria-label="Hauptnavigation">
+          <div class="site-header__links">
+            ${links}
+          </div>
+          <div class="site-header__actions">
+            <button type="button" class="app-nav__button" data-action="consent"></button>
+            <button type="button" class="app-nav__button secondary" data-action="export">Export</button>
+            <a class="app-nav__link app-nav__link--secondary" href="/privacy.html">Datenschutz</a>
+          </div>
+        </nav>
+      </div>
+    </header>
   `;
-  ensureNavOverlayRoot();
 }
 
 function updateConsentButton(consented) {
@@ -116,100 +124,69 @@ function highlightRoute(slug) {
   });
 }
 
-function ensureNavOverlayRoot() {
-  if (navOverlayRoot) return navOverlayRoot;
-  navOverlayRoot = document.getElementById('nav-overlay');
-  if (!navOverlayRoot) {
-    navOverlayRoot = document.createElement('div');
-    navOverlayRoot.id = 'nav-overlay';
-    navOverlayRoot.className = 'nav-overlay';
-    navOverlayRoot.setAttribute('hidden', '');
-    document.body.appendChild(navOverlayRoot);
-  }
-  if (!navOverlayListenersBound) {
-    navOverlayRoot.addEventListener('click', handleNavOverlayClick);
-    navOverlayListenersBound = true;
-  }
-  return navOverlayRoot;
+function getSiteHeader() {
+  if (!navRoot) return null;
+  return navRoot.querySelector('.site-header');
 }
 
-function handleNavOverlayClick(event) {
-  const overlay = ensureNavOverlayRoot();
-  if (!overlay) return;
-  const dismissTarget = event.target.closest('[data-overlay-dismiss]');
-  if (dismissTarget) {
-    event.preventDefault();
-    closeNavOverlay();
-    return;
+function getMenuToggle() {
+  if (!navRoot) return null;
+  return navRoot.querySelector('[data-action="toggle-menu"]');
+}
+
+function bindMenuListeners() {
+  if (navMenuListenersBound) return;
+  document.addEventListener('click', handleMenuDocumentClick, true);
+  document.addEventListener('keydown', handleMenuKeydown, true);
+  navMenuListenersBound = true;
+}
+
+function unbindMenuListeners() {
+  if (!navMenuListenersBound) return;
+  document.removeEventListener('click', handleMenuDocumentClick, true);
+  document.removeEventListener('keydown', handleMenuKeydown, true);
+  navMenuListenersBound = false;
+}
+
+function setMenuOpen(open) {
+  const header = getSiteHeader();
+  const toggle = getMenuToggle();
+  navMenuOpen = !!open;
+  if (header) {
+    header.dataset.menuOpen = navMenuOpen ? 'true' : 'false';
   }
-  const routeTarget = event.target.closest('[data-route]');
-  if (routeTarget) {
-    const route = routeTarget.dataset.route;
-    if (!route) return;
-    event.preventDefault();
-    window.location.hash = `#/${route}`;
-    closeNavOverlay();
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', navMenuOpen ? 'true' : 'false');
+  }
+  if (navMenuOpen) {
+    bindMenuListeners();
+  } else {
+    unbindMenuListeners();
   }
 }
 
-function handleNavOverlayKeydown(event) {
-  if (!navOverlayOpen) return;
+function closeMenu() {
+  setMenuOpen(false);
+}
+
+function toggleMenu() {
+  setMenuOpen(!navMenuOpen);
+}
+
+function handleMenuDocumentClick(event) {
+  if (!navMenuOpen) return;
+  const header = getSiteHeader();
+  if (!header) return;
+  if (!header.contains(event.target)) {
+    closeMenu();
+  }
+}
+
+function handleMenuKeydown(event) {
+  if (!navMenuOpen) return;
   if (event.key === 'Escape') {
-    event.preventDefault();
-    closeNavOverlay();
+    closeMenu();
   }
-}
-
-function openNavOverlay() {
-  const overlay = ensureNavOverlayRoot();
-  if (!overlay || navOverlayOpen) return;
-  const cards = Object.entries(ROUTES)
-    .map(([slug, route]) => {
-      const label = route && route.label ? route.label : slug;
-      return `
-        <li class="nav-overlay__grid-item">
-          <button type="button" class="nav-overlay__card" data-route="${slug}">
-            <span class="nav-overlay__card-title">${label}</span>
-          </button>
-        </li>`;
-    })
-    .join('');
-  overlay.innerHTML = `
-    <div class="nav-overlay__backdrop" data-overlay-dismiss="true"></div>
-    <div class="nav-overlay__panel" role="dialog" aria-modal="true" aria-labelledby="nav-overlay-title">
-      <header class="nav-overlay__header">
-        <h2 id="nav-overlay-title">Experimente</h2>
-        <p class="nav-overlay__subtitle">Wähle ein Experiment aus</p>
-      </header>
-      <ul class="nav-overlay__grid" role="list">
-        ${cards}
-      </ul>
-    </div>
-  `;
-  navOverlayLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  overlay.classList.add('visible');
-  overlay.removeAttribute('hidden');
-  navOverlayOpen = true;
-  document.addEventListener('keydown', handleNavOverlayKeydown, true);
-  const firstCard = overlay.querySelector('[data-route]');
-  if (firstCard && typeof firstCard.focus === 'function') {
-    requestAnimationFrame(() => firstCard.focus());
-  }
-}
-
-function closeNavOverlay() {
-  if (!navOverlayOpen) return;
-  const overlay = ensureNavOverlayRoot();
-  if (!overlay) return;
-  overlay.classList.remove('visible');
-  overlay.setAttribute('hidden', '');
-  overlay.innerHTML = '';
-  navOverlayOpen = false;
-  document.removeEventListener('keydown', handleNavOverlayKeydown, true);
-  if (navOverlayLastFocus && typeof navOverlayLastFocus.focus === 'function') {
-    navOverlayLastFocus.focus();
-  }
-  navOverlayLastFocus = null;
 }
 
 function parseRoute(hash) {
@@ -233,8 +210,8 @@ function mountRoute(slug) {
 }
 
 function handleRouteChange() {
-  if (navOverlayOpen) {
-    closeNavOverlay();
+  if (navMenuOpen) {
+    closeMenu();
   }
   const slug = parseRoute(window.location.hash);
   if (!slug) return;
@@ -248,15 +225,21 @@ function handleRouteChange() {
 function setupNavHandlers() {
   if (!navRoot) return;
   navRoot.addEventListener('click', event => {
+    const toggleButton = event.target.closest('[data-action="toggle-menu"]');
+    if (toggleButton) {
+      event.preventDefault();
+      toggleMenu();
+      return;
+    }
     const targetButton = event.target.closest('button[data-action]');
     if (targetButton) {
       event.preventDefault();
       const action = targetButton.dataset.action;
-      if (action === 'experiments') {
-        openNavOverlay();
-      } else if (action === 'consent') {
+      if (action === 'consent') {
+        closeMenu();
         consentController.open();
       } else if (action === 'export') {
+        closeMenu();
         triggerDataExport();
         showToast('Export geöffnet', { variant: 'info', duration: 2400 });
       }
@@ -268,6 +251,7 @@ function setupNavHandlers() {
       if (!route) return;
       event.preventDefault();
       window.location.hash = `#/${route}`;
+      closeMenu();
     }
   });
 }
