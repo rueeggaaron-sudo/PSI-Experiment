@@ -37,13 +37,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: linear-gradient(
-    135deg,
-    rgba(35, 22, 72, 0.92),
-    rgba(6, 8, 24, 0.9)
-  );
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(161, 132, 255, 0.32);
+  background: transparent;
+  border-bottom: none;
+  backdrop-filter: none;
 }
 
 .site-header__inner {
@@ -52,8 +48,9 @@ body {
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 20px;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
 }
 
 .site-header__brand {
@@ -66,6 +63,7 @@ body {
   text-transform: uppercase;
   text-shadow: 0 6px 18px rgba(58, 16, 119, 0.55);
   display: block;
+  padding: 4px 0;
 }
 
 .site-header__brand:hover {
@@ -75,23 +73,23 @@ body {
 .site-header__nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 20px;
   width: 100%;
 }
 
 .site-header__links {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .site-header__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .site-header__toggle {
@@ -160,16 +158,17 @@ body {
   color: var(--text);
   text-decoration: none;
   font-weight: 500;
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid transparent;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
 }
 
 .app-nav__link:hover {
-  background: rgba(123, 98, 255, 0.18);
-  border-color: rgba(173, 147, 255, 0.3);
   color: #fdfbff;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
 }
 
 .app-nav__link--secondary {
@@ -181,10 +180,10 @@ body {
 }
 
 .app-nav__link--active {
-  background: rgba(139, 109, 255, 0.28);
-  border-color: rgba(198, 173, 255, 0.4);
   color: #fff;
-  box-shadow: 0 12px 28px rgba(74, 42, 163, 0.35);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
 }
 
 .app-nav__button {
@@ -223,6 +222,8 @@ body {
 @media (max-width: 900px) {
   .site-header__inner {
     gap: 16px;
+    align-items: stretch;
+    text-align: left;
   }
 
   .site-header__toggle {
