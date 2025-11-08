@@ -978,3 +978,5 @@ export function unmount() {
   }
 }
 
+
+export { mount as mountBtcAudio, unmount as unmountBtcAudio };
