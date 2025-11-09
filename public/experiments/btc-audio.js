@@ -385,6 +385,7 @@ export function mount(root, context = {}) {
     sessionFinishedAt: null,
     lastSession: null,
     connectionStatus: 'idle',
+    connectionDetails: null,
     mappingInfo: {
       ...MAPPING_CONFIG,
       base_frequency_hz: MAPPING_CONFIG.baseFrequencyHz,
@@ -439,6 +440,8 @@ export function mount(root, context = {}) {
 
   const setConnectionStatus = (status, details = {}) => {
     state.connectionStatus = status;
+    const hasDetails = details && Object.keys(details).length > 0;
+    state.connectionDetails = hasDetails ? { ...details } : null;
     if (status === 'connected') {
       const { height } = details;
       const suffix = height ? `Block #${height}` : 'Blockchain';
@@ -580,7 +583,10 @@ export function mount(root, context = {}) {
     if (reason.startsWith('local')) {
       setConnectionStatus('local');
     } else if (reason.startsWith('fallback')) {
-      const fallbackOrigin = options.origin || (reason.includes('fetch') ? 'proxy' : 'blockchain');
+      const fallbackOrigin =
+        options.origin ||
+        state.connectionDetails?.origin ||
+        (reason.includes('fetch') ? 'proxy' : 'blockchain');
       setConnectionStatus('error', { origin: fallbackOrigin });
     }
   };
@@ -649,6 +655,7 @@ export function mount(root, context = {}) {
     state.sessionFinishedAt = null;
     state.lastSession = null;
     state.connectionStatus = state.source === 'btc' ? 'idle' : 'local';
+    state.connectionDetails = null;
     updateExportButtons();
   };
 
@@ -661,7 +668,7 @@ export function mount(root, context = {}) {
         state.sequenceIndex = 0;
       } else {
         if (state.source === 'btc') {
-          setRandomSequence('fallback-loop', { origin: 'blockchain' });
+          setRandomSequence('fallback-loop', { origin: state.connectionDetails?.origin });
         } else {
           setRandomSequence('local-loop');
         }
