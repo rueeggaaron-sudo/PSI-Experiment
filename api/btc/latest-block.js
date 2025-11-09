@@ -15,6 +15,72 @@ const jsonResponse = (status, body, extraHeaders = {}) => {
   });
 };
 
+const sanitizeForwardedForValue = rawValue => {
+  if (!rawValue || typeof rawValue !== 'string') {
+    return null;
+  }
+
+  let value = rawValue.trim();
+  if (!value) {
+    return null;
+  }
+
+  if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+    value = value.slice(1, -1).trim();
+  }
+
+  if (!value) {
+    return null;
+  }
+
+  if (value.startsWith('[')) {
+    const closingIndex = value.indexOf(']');
+    if (closingIndex > 0) {
+      return value.slice(1, closingIndex).trim() || null;
+    }
+    return null;
+  }
+
+  const portSeparator = value.indexOf(':');
+  if (portSeparator > -1) {
+    value = value.slice(0, portSeparator).trim();
+  }
+
+  return value || null;
+};
+
+const parseForwardedHeader = headerValue => {
+  if (!headerValue || typeof headerValue !== 'string') {
+    return null;
+  }
+
+  const entries = headerValue.split(',');
+  for (const entry of entries) {
+    const directives = entry.split(';');
+    for (const directive of directives) {
+      const trimmed = directive.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const equalsIndex = trimmed.indexOf('=');
+      if (equalsIndex === -1) {
+        continue;
+      }
+      const key = trimmed.slice(0, equalsIndex).trim().toLowerCase();
+      if (key !== 'for') {
+        continue;
+      }
+      const rawValue = trimmed.slice(equalsIndex + 1).trim();
+      const sanitized = sanitizeForwardedForValue(rawValue);
+      if (sanitized) {
+        return sanitized;
+      }
+    }
+  }
+
+  return null;
+};
+
 const getClientKey = req => {
   if (!req || !req.headers) {
     return 'global';
@@ -22,10 +88,14 @@ const getClientKey = req => {
 
   const headers = req.headers;
   let forwarded = null;
+  let forwardedSource = null;
 
   if (typeof headers.get === 'function') {
     try {
       forwarded = headers.get('x-forwarded-for');
+      if (forwarded) {
+        forwardedSource = 'x-forwarded-for';
+      }
     } catch (error) {
       forwarded = null;
     }
@@ -42,6 +112,7 @@ const getClientKey = req => {
     ];
 
     for (const key of candidates) {
+      const lowerKey = typeof key === 'string' ? key.toLowerCase() : key;
       if (key in headers) {
         const value = headers[key];
         if (Array.isArray(value)) {
@@ -51,11 +122,15 @@ const getClientKey = req => {
         } else {
           forwarded = value;
         }
-        if (forwarded) break;
+        if (forwarded) {
+          forwardedSource = lowerKey;
+          break;
+        }
       } else if (typeof headers.get === 'function') {
         const value = headers.get(key);
         if (value) {
           forwarded = value;
+          forwardedSource = lowerKey;
           break;
         }
       }
@@ -67,6 +142,14 @@ const getClientKey = req => {
   }
 
   if (!forwarded) {
+    return 'global';
+  }
+
+  if (forwardedSource === 'forwarded') {
+    const parsedForwarded = parseForwardedHeader(forwarded);
+    if (parsedForwarded) {
+      return parsedForwarded;
+    }
     return 'global';
   }
 
