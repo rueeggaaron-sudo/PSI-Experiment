@@ -66,7 +66,7 @@ const template = `
   </main>
 `;
 
-const BLOCKCHAIN_ENDPOINT = 'https://blockchain.info/latestblock';
+const BLOCKCHAIN_ENDPOINT = '/api/btc/latest-block';
 const MAX_POINTS = 160;
 const HASH_BYTE_LENGTH = 32;
 const RANDOM_SEQUENCE_LENGTH = 32;
@@ -85,6 +85,18 @@ const MAPPING_CONFIG = {
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const createProxyError = (message, { code = 'proxy_error', origin, details } = {}) => {
+  const error = new Error(message);
+  error.code = code;
+  if (origin) {
+    error.origin = origin;
+  }
+  if (details !== undefined) {
+    error.details = details;
+  }
+  return error;
+};
 
 const makeDownload = (filename, mime, dataStr) => {
   const blob = new Blob([dataStr], { type: mime });
@@ -434,7 +446,14 @@ export function mount({ root, navigate } = {}) {
       updateStatus({ message: 'Lokaler Zufallsmodus aktiv.' });
       setError('');
     } else if (status === 'error') {
-      updateStatus({ message: 'Verbindungsfehler – lokaler Fallback.' });
+      const { origin } = details;
+      let prefix = 'Verbindungsfehler';
+      if (origin === 'proxy') {
+        prefix = 'Proxy-Fehler';
+      } else if (origin === 'blockchain') {
+        prefix = 'Blockchain-Fehler';
+      }
+      updateStatus({ message: `${prefix} – lokaler Fallback.` });
     } else {
       updateStatus({ message: '' });
     }
@@ -544,7 +563,7 @@ export function mount({ root, navigate } = {}) {
     }
   };
 
-  const setRandomSequence = (reason = 'local') => {
+  const setRandomSequence = (reason = 'local', options = {}) => {
     const bytes = getRandomBytes(RANDOM_SEQUENCE_LENGTH);
     const sequenceId = `${reason}-${Date.now()}`;
     const meta = {
@@ -559,7 +578,8 @@ export function mount({ root, navigate } = {}) {
     if (reason.startsWith('local')) {
       setConnectionStatus('local');
     } else if (reason.startsWith('fallback')) {
-      setConnectionStatus('error');
+      const fallbackOrigin = options.origin || (reason.includes('fetch') ? 'proxy' : 'blockchain');
+      setConnectionStatus('error', { origin: fallbackOrigin });
     }
   };
 
@@ -638,7 +658,11 @@ export function mount({ root, navigate } = {}) {
       if (state.sequenceMeta?.source === 'blockchain' && state.connectionStatus === 'connected') {
         state.sequenceIndex = 0;
       } else {
-        setRandomSequence(state.source === 'btc' ? 'fallback-loop' : 'local-loop');
+        if (state.source === 'btc') {
+          setRandomSequence('fallback-loop', { origin: 'blockchain' });
+        } else {
+          setRandomSequence('local-loop');
+        }
       }
     }
     const baseEvent = state.sequence[state.sequenceIndex];
@@ -718,29 +742,71 @@ export function mount({ root, navigate } = {}) {
       try {
         setError('');
         updateStatus({ message: 'Verbinde Blockchain…' });
-        const url = `${BLOCKCHAIN_ENDPOINT}?cors=true&_=${Date.now()}`;
+        const url = `${BLOCKCHAIN_ENDPOINT}?_=${Date.now()}`;
         const response = await fetch(url, {
           cache: 'no-store',
           mode: 'cors',
           signal: controller.signal,
         });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        const responseText = await response.text();
+        let payload = null;
+        if (responseText) {
+          try {
+            payload = JSON.parse(responseText);
+          } catch (parseError) {
+            payload = null;
+          }
         }
-        const json = await response.json();
-        const hash = String(json?.hash || '');
+        if (!response.ok) {
+          const details = payload && typeof payload === 'object' ? payload : null;
+          throw createProxyError(details?.error || `Proxy HTTP ${response.status}`, {
+            code: details?.code || 'proxy_http_error',
+            origin: 'proxy',
+            details: details ?? {
+              status: response.status,
+              body: responseText.slice(0, 256),
+            },
+          });
+        }
+        if (!payload || typeof payload !== 'object') {
+          throw createProxyError('Ungültige Proxy-Antwort (kein JSON).', {
+            code: 'proxy_invalid_json',
+            origin: 'proxy',
+            details: { body: responseText.slice(0, 256) },
+          });
+        }
+        if (payload.error) {
+          const origin = typeof payload.code === 'string' && payload.code.startsWith('upstream') ? 'blockchain' : 'proxy';
+          throw createProxyError(payload.error, {
+            code: payload.code || 'proxy_error',
+            origin,
+            details: payload,
+          });
+        }
+        const hash = typeof payload.hash === 'string' ? payload.hash : '';
         const bytes = hexToBytes(hash).slice(0, HASH_BYTE_LENGTH);
         if (!hash || bytes.length === 0) {
-          throw new Error('Kein gültiger Blockhash');
+          throw createProxyError('Blockchain-Daten ohne gültigen Blockhash.', {
+            code: 'proxy_invalid_hash',
+            origin: 'blockchain',
+            details: payload,
+          });
         }
-        const heightValue = Number(json?.height ?? json?.block_height);
-        const timeValue = Number(json?.time);
-        const blockIndexValue = Number(json?.block_index);
+        const heightValue = Number(payload.height);
+        const timeValue = Number(payload.time);
+        const blockIndexValue = Number(payload.block_index);
+        if (!Number.isFinite(heightValue) || !Number.isFinite(timeValue) || !Number.isFinite(blockIndexValue)) {
+          throw createProxyError('Blockchain-Daten unvollständig.', {
+            code: 'proxy_invalid_payload',
+            origin: 'blockchain',
+            details: payload,
+          });
+        }
         const blockData = {
           hash,
-          height: Number.isFinite(heightValue) ? heightValue : null,
-          time: Number.isFinite(timeValue) ? timeValue : null,
-          block_index: Number.isFinite(blockIndexValue) ? blockIndexValue : null,
+          height: heightValue,
+          time: timeValue,
+          block_index: blockIndexValue,
         };
         const meta = {
           sequenceId: hash,
@@ -754,18 +820,43 @@ export function mount({ root, navigate } = {}) {
         state.lastUpdated = Date.now();
         setConnectionStatus('connected', blockData);
         updateStatus({
-          sourceText: 'Blockchain',
+          sourceText: 'Blockchain (Proxy)',
           updated: new Date(state.lastUpdated).toLocaleTimeString(),
         });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
-        const isCors = error?.name === 'TypeError' && (!error.message || error.message === 'Failed to fetch');
-        const message = isCors ? 'CORS/Netzwerkproblem bei Blockchain-API.' : `Blockchain konnte nicht geladen werden: ${error?.message || error}`;
+        const isNetworkError = error?.name === 'TypeError' && (!error.message || error.message === 'Failed to fetch');
+        const code = typeof error?.code === 'string' ? error.code : '';
+        let origin = error?.origin;
+        if (!origin) {
+          if (code.startsWith('proxy')) {
+            origin = 'proxy';
+          } else if (code.startsWith('upstream')) {
+            origin = 'blockchain';
+          }
+        }
+        if (!origin && isNetworkError) {
+          origin = 'proxy';
+        }
+        if (!origin) {
+          origin = 'blockchain';
+        }
+        let message;
+        if (code === 'proxy_rate_limit') {
+          message = 'Proxy-Fehler: Rate-Limit erreicht. Bitte kurz warten.';
+          origin = 'proxy';
+        } else if (origin === 'proxy') {
+          message = `Proxy-Fehler: ${error?.message || 'Unbekannter Fehler.'}`;
+        } else if (origin === 'blockchain') {
+          message = `Blockchain-Fehler: ${error?.message || 'Unbekannter Fehler.'}`;
+        } else {
+          message = error?.message || String(error);
+        }
         setError(message);
-        setConnectionStatus('error');
-        setRandomSequence('fallback-fetch');
+        setConnectionStatus('error', { origin });
+        setRandomSequence('fallback-fetch', { origin });
       }
     };
 
@@ -809,7 +900,7 @@ export function mount({ root, navigate } = {}) {
     state.lastUpdated = null;
     updateStatus({ stateText: 'Laufend', value: '--', updated: '--', message: 'Audio läuft…' });
     if (state.source === 'btc') {
-      updateStatus({ sourceText: 'Blockchain' });
+      updateStatus({ sourceText: 'Blockchain (Proxy)' });
       handleBtcFetch();
     } else {
       updateStatus({ sourceText: 'Lokal' });
@@ -831,7 +922,7 @@ export function mount({ root, navigate } = {}) {
     if (!event?.target?.value) return;
     const value = event.target.value;
     state.source = value;
-    updateStatus({ sourceText: value === 'btc' ? 'Blockchain' : 'Lokal' });
+      updateStatus({ sourceText: value === 'btc' ? 'Blockchain (Proxy)' : 'Lokal' });
     if (state.running) {
       if (value === 'btc') {
         handleBtcFetch();
