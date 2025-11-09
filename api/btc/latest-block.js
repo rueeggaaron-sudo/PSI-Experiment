@@ -16,8 +16,60 @@ const jsonResponse = (status, body, extraHeaders = {}) => {
 };
 
 const getClientKey = req => {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (!forwarded) return 'global';
+  if (!req || !req.headers) {
+    return 'global';
+  }
+
+  const headers = req.headers;
+  let forwarded = null;
+
+  if (typeof headers.get === 'function') {
+    try {
+      forwarded = headers.get('x-forwarded-for');
+    } catch (error) {
+      forwarded = null;
+    }
+  }
+
+  if (!forwarded) {
+    const candidates = [
+      'x-forwarded-for',
+      'X-Forwarded-For',
+      'X_FORWARDED_FOR',
+      'X-FORWARDED-FOR',
+      'forwarded',
+      'Forwarded',
+    ];
+
+    for (const key of candidates) {
+      if (key in headers) {
+        const value = headers[key];
+        if (Array.isArray(value)) {
+          forwarded = value[0];
+        } else if (value && typeof value === 'object' && 'value' in value) {
+          forwarded = value.value;
+        } else {
+          forwarded = value;
+        }
+        if (forwarded) break;
+      } else if (typeof headers.get === 'function') {
+        const value = headers.get(key);
+        if (value) {
+          forwarded = value;
+          break;
+        }
+      }
+    }
+  }
+
+  if (typeof forwarded !== 'string') {
+    forwarded = String(forwarded || '');
+  }
+
+  if (!forwarded) {
+    return 'global';
+  }
+
   return forwarded.split(',')[0].trim() || 'global';
 };
 
