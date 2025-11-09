@@ -303,9 +303,11 @@ const generateSessionId = () => {
 
 let activeTeardown = null;
 
-export function mount({ root, navigate } = {}) {
+export function mount(root, context = {}) {
   unmount();
   if (!root) return;
+
+  const { navigate } = context;
 
   root.innerHTML = template;
 
