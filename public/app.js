@@ -77,7 +77,7 @@ function renderNav() {
   navRoot.innerHTML = `
     <header class="site-header" data-menu-open="false">
       <div class="site-header__inner">
-        <a class="site-header__brand" href="#/${DEFAULT_ROUTE}" data-route="${DEFAULT_ROUTE}">PSI&nbsp;Experimente</a>
+        <a class="site-header__brand" href="#/${DEFAULT_ROUTE}" data-route="${DEFAULT_ROUTE}">PSI&nbsp;und&nbsp;andere&nbsp;EXPERIMENTE</a>
         <button type="button" class="site-header__toggle" data-action="toggle-menu" aria-expanded="false" aria-controls="site-menu">
           Menü
           <span class="site-header__toggle-icon" aria-hidden="true"></span>
