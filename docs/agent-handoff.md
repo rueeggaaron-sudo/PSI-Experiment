@@ -1,0 +1,11 @@
+# PSI Experiment – Übergabe
+
+## Lokale Inhaltsprüfung, 24.10.2026
+
+- Owner: PSI-CI-Abschluss; kanonischer Writer `/private/tmp/PSI-Experiment-local-ci-20261023`, Branch `codex/local-content-check-20261023`.
+- Ausgangsstand: `42203b14c23a913e82f85c89dcf1566929cc036e`, frisch geprüft gegen `origin/main` `50bf840650218af070431cf29560eeb05f0b4846`. Der vorhandene unabhängige Review dieses Kandidaten wurde nach gezieltem Driftcheck übernommen. Das folgende Delta korrigiert nur die README und ergänzt diese Übergabe.
+- Änderung: Ein lokaler Standardbibliothek-Checker prüft HTML-Grundstruktur, lokale Datei-/Fragmentverweise und JSON-/Manifestreferenzen. Zwei fehlende Icon-Pfade im Manifest zeigen auf die bereits vorhandenen gleich grossen PNG-Dateien. `public/index.html` ist bytegleich zum Hauptstand; wissenschaftliche Aussagen und Studieninhalte bleiben unverändert.
+- Nachweis: `python3 scripts/check_static_content.py` und `git diff --check` bestanden am 24.10.2026 mit Python 3.14.7; PNG-Abmessungen direkt als 192 × 192 und 512 × 512 geprüft. Keine Installation, keine Datenbank. Kein Nachweis für JavaScript-Ausführung, Produktablauf oder Sicherheit.
+- Gegenwärtiger Hauptstand enthält keine GitHub-Workflowdateien. Es wird kein automatischer Hosted-Testjob abgeschaltet und kein neuer angelegt. Der registrierte historische Pages-Status (`build_type: workflow`) hat keine zugehörige aktuelle Workflowdatei; die letzten sichtbaren Pages-Läufe stammen aus Oktober 2025. Keine Pages-Aktivierung oder manuelle Ausführung.
+- Releasegrenze: genau ein gebündelter Branchpush und PR; höchstens eine automatische Vercel-Vorschau und eine Produktion ohne Wiederholung im konkret freigegebenen Kontingent. Bestehende Vercel-Gitverknüpfung: dieses Repository, Produktionsbranch `main`. Keine Experiment-, Analytics-, Datenerhebungs- oder andere Provideraktivierung.
+- Nächster Schritt: neues Doku-Delta unabhängig prüfen, dann regulären PR liefern. Merge erst mit legitim vorliegender GitHub-Approval und erfolgreichem Required-Vercel-Check; Schutzregeln bleiben erhalten. Bei fehlender Approval nur den Merge halten und den konkreten PR an die Koordination übergeben. PR und spätere Releasebelege gehören zur GitHub-Historie; keine zusätzliche Deployment-Dokumentationsrunde.
